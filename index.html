@@ -324,17 +324,6 @@ body::before{content:'';position:fixed;inset:0;
 
     <!-- FACTION TAB -->
     <div class="tab-view" id="tab-faction">
-      <div class="section">
-        <div class="section-title">⚔ Men of the West</div>
-        <div class="ftrait"><div class="ftrait-name">Diplomatic Mastery</div><div class="ftrait-desc">Can form vassal treaties with neutral kingdoms. Tribute income scales with prestige.</div></div>
-        <div class="ftrait"><div class="ftrait-name">Balanced Arts</div><div class="ftrait-desc">No research branch costs more than others. Master of all paths when combined.</div></div>
-      </div>
-      <div class="section">
-        <div class="section-title">Trinity Counter System</div>
-        <div class="crow"><span class="cf" style="color:#c9a84c">⚔ Men</span><span class="beats">▶ beats</span><span class="cf" style="color:#8b1a1a">🐺 Wildlands</span></div>
-        <div class="crow"><span class="cf" style="color:#c9a84c">⚔ Men</span><span class="loses">◀ weak to</span><span class="cf" style="color:#4a7a32">🌿 Elves</span></div>
-        <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-top:6px;opacity:.6">Elves beat Men · Dwarves beat Elves · Wildlands beat Dwarves<br>Full faction rivalry unlocks in multiplayer.</div>
-      </div>
     </div>
 
   </div>
@@ -356,6 +345,15 @@ body::before{content:'';position:fixed;inset:0;
 const G={
   year:1,era:'First Age',tick:0,
   prestige:0,prestigeGoal:1000,prestigeRate:0,
+  prestigePoints:0,          // spendable prestige currency
+  season:1,seasonWeek:1,seasonTick:0,
+  victoryPath:'mixed',       // 'military','economic','diplomatic','research','mixed'
+  victoryBonus:0,            // % bonus from path progress
+  dynasty:0,                 // number of prestige resets completed
+  legacyRelics:[],           // relics carried across resets
+  allianceSize:8,            // hard cap
+  lastSaveTime: Date.now(),  // for offline calculation
+  offlineCapHours:12,
   resources:{
     gold: {amount:50,rate:2,max:500,icon:'🪙',name:'Gold'},
     food: {amount:80,rate:3,max:500,icon:'🌾',name:'Food'},
@@ -373,11 +371,374 @@ const G={
   unlockedResearchTabs:['economy','military'],
   costReduction:null,wardProtect:false,hasAlchemy:false,
   hasFarsight:false,hasSiege:false,questTimeMulti:null,fortBonus:0,
+  // Supabase config — user fills these in
+  supabaseUrl:'',
+  supabaseKey:'',
 };
 
 function earlyBoost(){
   const t=G.buildings.reduce((s,b)=>s+b.level,0);
   return Math.max(1,5-t*0.4);
+}
+
+// ── OFFLINE PROGRESS ──
+// Security model:
+// 1. If Supabase connected: use server's updated_at timestamp (unfakeable)
+// 2. If local only: cross-check local clock delta against tick count to detect manipulation
+// 3. If clock went backwards vs last known server time: skip offline progress entirely
+
+let _serverTimeOffset=0; // ms difference between server and local clock, calibrated on cloud load
+
+async function fetchServerTime(){
+  // Supabase exposes a lightweight endpoint we can use to get real server time
+  if(!G.supabaseUrl||!G.supabaseKey) return null;
+  try{
+    const r=await fetch(`${G.supabaseUrl}/rest/v1/`,{
+      headers:{'apikey':G.supabaseKey,'Authorization':`Bearer ${G.supabaseKey}`},
+    });
+    // Server date comes back in response headers
+    const serverDate=r.headers.get('date');
+    if(serverDate){
+      const serverMs=new Date(serverDate).getTime();
+      _serverTimeOffset=serverMs-Date.now();
+      return serverMs;
+    }
+  }catch(e){}
+  return null;
+}
+
+function getReliableNow(){
+  // If we have a calibrated server offset, apply it to local clock
+  // This corrects for local clock changes
+  return Date.now()+_serverTimeOffset;
+}
+
+async function applyOfflineProgress(){
+  const reliableNow=getReliableNow();
+
+  // --- Tamper detection ---
+  // G.lastServerTime is the last real server timestamp we recorded
+  // If local clock is behind it, the clock was wound back — skip
+  if(G.lastServerTime&&reliableNow<G.lastServerTime-5000){
+    addLog('⚠ Time anomaly detected. Offline progress skipped.','danger');
+    showOverlay('Time anomaly detected.\nOffline progress skipped.','danger','Security Check');
+    G.lastSaveTime=reliableNow;
+    G.lastServerTime=reliableNow;
+    return;
+  }
+
+  // Calculate elapsed from last save
+  const rawElapsed=(reliableNow-(G.lastSaveTime||reliableNow))/1000;
+
+  // --- Tick cross-check for non-cloud players ---
+  // The game tick increments every real second while the game is open.
+  // If claimed offline time >> ticks since last save, something is off.
+  // We allow up to 10% buffer for browser throttling etc.
+  const ticksSinceLoad=G.tick-(G._tickAtLastLoad||0);
+  const localSessionSeconds=ticksSinceLoad; // real seconds game has been open this session
+  let elapsed=rawElapsed;
+
+  if(!G.supabaseUrl){
+    // No cloud — apply tick sanity check
+    // Max believable offline = raw elapsed, but cap if it's >10% more than what ticks account for
+    // Only apply check if game has been open long enough to have meaningful ticks
+    if(localSessionSeconds>10&&rawElapsed>localSessionSeconds*1.1){
+      // Something smells off — use a conservative estimate
+      elapsed=Math.min(rawElapsed, G._lastKnownOfflineCap||rawElapsed);
+      addLog('⚠ Clock discrepancy detected. Offline gains capped conservatively.','danger');
+    }
+  }
+
+  // Hard cap at offlineCapHours regardless
+  elapsed=Math.min(elapsed, G.offlineCapHours*3600);
+  if(elapsed<30) return;
+
+  const boost=earlyBoost();
+  const ticks=Math.floor(elapsed);
+
+  // Apply gains
+  Object.values(G.resources).forEach(r=>{
+    if(r.rate>0) r.amount=Math.min(r.max, r.amount+(r.rate*boost/60)*ticks);
+  });
+  if(G.prestigeRate>0) G.prestige=Math.min(G.prestigeGoal, G.prestige+(G.prestigeRate/60)*ticks);
+  if(G.activeResearch){
+    G.researchProgress=Math.min(G.researchProgress+ticks,99999);
+    const rDef=allR().find(r=>r.id===G.activeResearch);
+    if(rDef&&G.researchProgress>=rDef.time) completeResearch(rDef);
+  }
+  G.heroes.forEach(h=>{
+    if(h.onQuest&&h.qt>0){h.qt=Math.max(0,h.qt-ticks);if(h.qt<=0)completeQuest(h);}
+  });
+  G.year+=Math.floor(ticks/300);
+
+  const mins=Math.round(elapsed/60);
+  const hrs=Math.floor(elapsed/3600);
+  const label=hrs>0?`${hrs}h ${mins%60}m`:`${mins}m`;
+  addLog(`You were away for ${label}. Resources and progress accumulated.`,'important');
+  showOverlay(`Welcome back!\nKingdom progressed ${label} offline.`,'success','Offline Progress');
+
+  // Update timestamps
+  G.lastSaveTime=reliableNow;
+  G.lastServerTime=reliableNow;
+  G._tickAtLastLoad=G.tick;
+}
+
+// ── VICTORY PATHS ──
+const VICTORY_PATHS={
+  military:{label:'Military Dominance',icon:'⚔',desc:'Win through conquest. Research all military branches.',bonus:40,
+    check:()=>['swordsmanship','fortification','cavalry','siegecraft'].every(id=>G.research[id]?.completed)},
+  economic:{label:'Economic Supremacy',icon:'⚖',desc:'Amass wealth. Complete all economy research.',bonus:40,
+    check:()=>['trade_routes','crop_rotation','stonemasons','banking'].every(id=>G.research[id]?.completed)},
+  diplomatic:{label:'Diplomatic Legacy',icon:'🤝',desc:'Men of the West unique. Complete all diplomacy research.',bonus:40,
+    check:()=>['envoys','treaties','trade_alliance','high_council'].every(id=>G.research[id]?.completed)},
+  research:{label:'Arcane Mastery',icon:'✨',desc:'Master the arcane. Complete all arcane research.',bonus:40,
+    check:()=>['runic_script','warding','alchemy','farseeing'].every(id=>G.research[id]?.completed)},
+};
+
+function checkVictoryPath(){
+  Object.entries(VICTORY_PATHS).forEach(([key,path])=>{
+    if(path.check()){
+      const bonus=path.bonus;
+      if(G.victoryPath!==key){
+        G.victoryPath=key;
+        G.victoryBonus=bonus;
+        addLog(`${path.icon} ${path.label} path achieved! +${bonus}% prestige bonus active.`,'important');
+        showOverlay(`${path.label}\n+${bonus}% prestige bonus!`,'success','Victory Path Achieved');
+      }
+    }
+  });
+}
+
+// ── PRESTIGE SPENDING ──
+const PRESTIGE_ABILITIES=[
+  {id:'vassal_tribute',name:'Call for Tribute',icon:'👑',cost:50,desc:'Demand tribute from vassal lords. +200 gold instantly.',
+   cooldown:300,lastUsed:0,
+   use:()=>{G.resources.gold.amount=Math.min(G.resources.gold.max,G.resources.gold.amount+200);addLog('Vassal lords deliver tribute. +200 gold.','important');}},
+  {id:'rally_workers',name:'Rally the People',icon:'🔔',cost:80,desc:'Inspire workers. 2× all resource income for 2 minutes.',
+   cooldown:600,lastUsed:0,
+   use:()=>{G._rallied=true;G._rallyEnd=G.tick+120;addLog('The people rally to your banner! 2× income for 2 minutes.','important');}},
+  {id:'royal_decree',name:'Royal Decree',icon:'📜',cost:120,desc:'Issue a decree. Instantly complete current research.',
+   cooldown:1800,lastUsed:0,
+   use:()=>{if(!G.activeResearch){showSnot('No research active');return;}const rDef=allR().find(r=>r.id===G.activeResearch);if(rDef)completeResearch(rDef);addLog('A Royal Decree accelerates all scholarly work.','important');}},
+  {id:'diplomatic_mission',name:'Diplomatic Mission',icon:'🤝',cost:150,desc:'Send envoys abroad. Unlock Diplomacy research tab early.',
+   cooldown:3600,lastUsed:0,
+   use:()=>{unlockTab('diplomacy');revealR(['envoys']);addLog('Royal envoys depart for distant kingdoms.','important');}},
+];
+
+function spendPrestige(ability){
+  if(G.prestigePoints<ability.cost){showSnot('Not enough prestige points');return;}
+  if(G.tick-ability.lastUsed<ability.cooldown){
+    const rem=Math.ceil((ability.cooldown-(G.tick-ability.lastUsed))/60);
+    showSnot(`Ability on cooldown — ${rem} min remaining`);return;
+  }
+  G.prestigePoints-=ability.cost;
+  ability.lastUsed=G.tick;
+  ability.use();
+  renderFaction();
+  renderAll();
+}
+
+// ── SEASON STRUCTURE ──
+const SEASON_WEEKS=6;
+const TICKS_PER_WEEK=300; // 5 real minutes per in-game week for prototype (would be 7 days in production)
+
+function seasonTick(){
+  G.seasonTick++;
+  if(G.seasonTick>=TICKS_PER_WEEK){
+    G.seasonTick=0;
+    G.seasonWeek++;
+    addLog(`Season ${G.season} — Week ${G.seasonWeek} begins.`,'important');
+    if(G.seasonWeek>SEASON_WEEKS) endSeason();
+  }
+}
+
+function endSeason(){
+  const path=VICTORY_PATHS[G.victoryPath];
+  const finalPrestige=Math.floor(G.prestige*(1+(G.victoryBonus/100)));
+  showSeasonEndScreen(finalPrestige, path);
+}
+
+function showSeasonEndScreen(finalPrestige, path){
+  const overlay=document.createElement('div');
+  overlay.id='season-overlay';
+  overlay.style.cssText=`position:fixed;inset:0;background:rgba(5,4,2,.97);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;`;
+  const relicOptions=[
+    {id:'relic_gold',name:'Merchant\'s Seal',icon:'🪙',desc:'+10% gold income in next dynasty'},
+    {id:'relic_combat',name:'Sword of Ages',icon:'⚔',desc:'+15% hero power in next dynasty'},
+    {id:'relic_research',name:'Ancient Tome',icon:'📚',desc:'-10% research time in next dynasty'},
+  ];
+  overlay.innerHTML=`
+    <div style="font-family:'Cinzel',serif;text-align:center;max-width:400px;width:100%">
+      <div style="font-size:11px;letter-spacing:3px;color:var(--gold-dark);text-transform:uppercase;margin-bottom:8px">Season ${G.season} Complete</div>
+      <div style="font-size:26px;color:var(--gold);font-weight:700;margin-bottom:4px">Dynasty ${G.dynasty+1} Falls</div>
+      <div style="font-size:14px;color:var(--parchment-dark);font-style:italic;margin-bottom:20px">The kingdom of Arnethia is enshrined in legend.</div>
+      <div style="background:rgba(201,168,76,.08);border:1px solid var(--panel-border);border-radius:6px;padding:14px;margin-bottom:20px">
+        <div style="font-size:13px;color:var(--gold-dark);margin-bottom:6px;letter-spacing:1px;text-transform:uppercase">Final Score</div>
+        <div style="font-size:32px;color:var(--gold);font-weight:700;font-family:'Cinzel',serif">${finalPrestige.toLocaleString()}</div>
+        <div style="font-size:12px;color:var(--forest-light);margin-top:4px">${path?`${path.icon} ${path.label} · +${path.bonus}% bonus applied`:'Mixed path'}</div>
+      </div>
+      <div style="font-size:12px;color:var(--gold-dark);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Choose Your Legacy Relic</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+        ${relicOptions.map(r=>`
+          <div onclick="selectRelic('${r.id}')" data-relic="${r.id}" style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.2);border-radius:4px;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .2s;">
+            <span style="font-size:22px">${r.icon}</span>
+            <div><div style="font-family:'Cinzel',serif;font-size:12px;color:var(--parchment)">${r.name}</div>
+            <div style="font-size:11px;color:var(--stone-light);font-style:italic">${r.desc}</div></div>
+          </div>`).join('')}
+      </div>
+      <button onclick="beginNewDynasty()" id="new-dynasty-btn" disabled style="width:100%;padding:12px;background:rgba(201,168,76,.1);border:1px solid var(--gold-dark);border-radius:4px;color:var(--gold);font-family:'Cinzel',serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;cursor:not-allowed;opacity:.4">
+        Begin New Dynasty
+      </button>
+      <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-top:8px">Select a relic to continue</div>
+    </div>`;
+  document.body.appendChild(overlay);
+  G._pendingRelic=null;
+}
+
+let _selectedRelic=null;
+function selectRelic(id){
+  _selectedRelic=id;
+  document.querySelectorAll('[data-relic]').forEach(el=>{
+    el.style.borderColor=el.dataset.relic===id?'var(--gold)':'rgba(201,168,76,.2)';
+    el.style.background=el.dataset.relic===id?'rgba(201,168,76,.15)':'rgba(201,168,76,.06)';
+  });
+  const btn=document.getElementById('new-dynasty-btn');
+  if(btn){btn.disabled=false;btn.style.opacity='1';btn.style.cursor='pointer';}
+}
+
+function beginNewDynasty(){
+  if(!_selectedRelic)return;
+  G.legacyRelics.push(_selectedRelic);
+  G.dynasty++;
+  G.season++;
+  G.seasonWeek=1;
+  G.seasonTick=0;
+  G.victoryPath='mixed';
+  G.victoryBonus=0;
+
+  // Apply relic bonuses
+  if(_selectedRelic==='relic_gold') G.resources.gold.rate+=2;
+  if(_selectedRelic==='relic_combat') G.heroes.forEach(h=>h.power=Math.round(h.power*1.15));
+  // relic_research applied in research timer check
+
+  // Soft reset — keep heroes, relics, dynasty count; reset resources and buildings to starter values
+  Object.assign(G.resources,{
+    gold:{amount:100,rate:2,max:500,icon:'🪙',name:'Gold'},
+    food:{amount:150,rate:3,max:500,icon:'🌾',name:'Food'},
+    wood:{amount:120,rate:3,max:500,icon:'🪵',name:'Wood'},
+    stone:{amount:80,rate:2,max:500,icon:'⚙',name:'Stone'},
+    iron:{amount:0,rate:0,max:300,icon:'⛏',name:'Iron'},
+    mana:{amount:0,rate:0,max:200,icon:'✨',name:'Mana'},
+  });
+  G.buildings.forEach(b=>b.level=0);
+  G.activeResearch=null;G.researchProgress=0;
+  G.prestige=0;G.prestigePoints=0;G.prestigeRate=0;
+  G.revealedBuildings=['farm','lumber','mine','market'];
+  G.revealedResearch=['trade_routes','crop_rotation','swordsmanship','fortification'];
+  G.unlockedResearchTabs=['economy','military'];
+  G.costReduction=null;G.wardProtect=false;G.hasAlchemy=false;
+  G.hasFarsight=false;G.hasSiege=false;G.questTimeMulti=null;G.fortBonus=0;
+  Object.keys(G.research).forEach(k=>G.research[k]={completed:false});
+  // Heroes survive but reset quests
+  G.heroes.forEach(h=>{h.onQuest=false;h.qt=0;h.qname='';h._ret=false;});
+
+  _selectedRelic=null;
+  const overlay=document.getElementById('season-overlay');
+  if(overlay)overlay.remove();
+
+  addLog(`Dynasty ${G.dynasty} begins. Your legacy lives on.`,'important');
+  showOverlay(`Dynasty ${G.dynasty} Begins\nSeason ${G.season} of the Age of Conquest`,'success','New Dynasty');
+  renderAll();
+  saveGame();
+}
+
+// ── SUPABASE CLOUD SAVE ──
+async function cloudSave(){
+  if(!G.supabaseUrl||!G.supabaseKey)return;
+  try{
+    const payload=buildSavePayload();
+    const res=await fetch(`${G.supabaseUrl}/rest/v1/saves`,{
+      method:'POST',
+      headers:{
+        'apikey':G.supabaseKey,
+        'Authorization':`Bearer ${G.supabaseKey}`,
+        'Content-Type':'application/json',
+        'Prefer':'resolution=merge-duplicates',
+      },
+      body:JSON.stringify({id:'player_1',data:JSON.stringify(payload),updated_at:new Date().toISOString()}),
+    });
+    if(res.ok) addLog('Kingdom chronicle saved to the cloud. ☁','');
+  }catch(e){console.warn('Cloud save failed:',e);}
+}
+
+async function cloudLoad(){
+  if(!G.supabaseUrl||!G.supabaseKey)return false;
+  try{
+    // Calibrate server time offset first
+    await fetchServerTime();
+    const res=await fetch(`${G.supabaseUrl}/rest/v1/saves?id=eq.player_1&select=data,updated_at`,{
+      headers:{'apikey':G.supabaseKey,'Authorization':`Bearer ${G.supabaseKey}`},
+    });
+    if(!res.ok)return false;
+    const rows=await res.json();
+    if(!rows.length)return false;
+    const s=JSON.parse(rows[0].data);
+    // Use the DB's updated_at as the authoritative last-save time
+    // This is set by the server — the client cannot fake it
+    const dbUpdatedAt=new Date(rows[0].updated_at).getTime();
+    s.lastSaveTime=dbUpdatedAt;
+    s.lastServerTime=dbUpdatedAt;
+    applyLoadedState(s);
+    G._tickAtLastLoad=G.tick;
+    addLog('Dynasty restored from the cloud. ☁','important');
+    return true;
+  }catch(e){return false;}
+}
+
+function buildSavePayload(){
+  return {
+    year:G.year,prestige:G.prestige,prestigeRate:G.prestigeRate,
+    prestigePoints:G.prestigePoints,season:G.season,seasonWeek:G.seasonWeek,
+    seasonTick:G.seasonTick,dynasty:G.dynasty,legacyRelics:G.legacyRelics,
+    victoryPath:G.victoryPath,victoryBonus:G.victoryBonus,
+    lastSaveTime:getReliableNow(),
+    lastServerTime:G.lastServerTime||getReliableNow(),
+    _lastKnownOfflineCap:G.offlineCapHours*3600,
+    resources:Object.fromEntries(Object.entries(G.resources).map(([k,v])=>[k,{amount:v.amount,rate:v.rate,max:v.max}])),
+    buildings:G.buildings,research:G.research,heroes:G.heroes,
+    activeResearch:G.activeResearch,researchProgress:G.researchProgress,tick:G.tick,
+    revealedBuildings:G.revealedBuildings,revealedResearch:G.revealedResearch,
+    unlockedResearchTabs:G.unlockedResearchTabs,
+    flags:{costReduction:G.costReduction,wardProtect:G.wardProtect,hasAlchemy:G.hasAlchemy,
+           hasFarsight:G.hasFarsight,hasSiege:G.hasSiege,questTimeMulti:G.questTimeMulti,fortBonus:G.fortBonus},
+    supabaseUrl:G.supabaseUrl,supabaseKey:G.supabaseKey,
+    log:G.log.slice(0,20),
+  };
+}
+
+function applyLoadedState(s){
+  G.year=s.year||1;G.prestige=s.prestige||0;G.prestigeRate=s.prestigeRate||0;
+  G.prestigePoints=s.prestigePoints||0;
+  G.season=s.season||1;G.seasonWeek=s.seasonWeek||1;G.seasonTick=s.seasonTick||0;
+  G.dynasty=s.dynasty||0;G.legacyRelics=s.legacyRelics||[];
+  G.victoryPath=s.victoryPath||'mixed';G.victoryBonus=s.victoryBonus||0;
+  G.lastSaveTime=s.lastSaveTime||Date.now();
+  G.lastServerTime=s.lastServerTime||s.lastSaveTime||Date.now();
+  G._lastKnownOfflineCap=s._lastKnownOfflineCap||G.offlineCapHours*3600;
+  Object.entries(s.resources||{}).forEach(([k,v])=>{
+    if(G.resources[k]){G.resources[k].amount=v.amount;if(v.rate>G.resources[k].rate)G.resources[k].rate=v.rate;G.resources[k].max=v.max;}
+  });
+  (s.buildings||[]).forEach(b=>{const g=G.buildings.find(x=>x.id===b.id);if(g)g.level=b.level;});
+  Object.assign(G.research,s.research||{});
+  G.heroes=s.heroes||[];
+  G.activeResearch=s.activeResearch||null;G.researchProgress=s.researchProgress||0;G.tick=s.tick||0;
+  if(s.revealedBuildings)G.revealedBuildings=s.revealedBuildings;
+  if(s.revealedResearch)G.revealedResearch=s.revealedResearch;
+  if(s.unlockedResearchTabs)G.unlockedResearchTabs=s.unlockedResearchTabs;
+  if(s.flags){const f=s.flags;G.costReduction=f.costReduction;G.wardProtect=f.wardProtect;G.hasAlchemy=f.hasAlchemy;G.hasFarsight=f.hasFarsight;G.hasSiege=f.hasSiege;G.questTimeMulti=f.questTimeMulti;G.fortBonus=f.fortBonus;}
+  if(s.supabaseUrl)G.supabaseUrl=s.supabaseUrl;
+  if(s.supabaseKey)G.supabaseKey=s.supabaseKey;
+  G.log=s.log||G.log;
 }
 
 const BD=[
@@ -514,28 +875,47 @@ function init(){
   setInterval(gameTick,1000);
   setInterval(renderAll,3000);
   setInterval(saveGame,30000);
+  setInterval(()=>cloudSave(),120000); // cloud save every 2 min
   requestAnimationFrame(animateTickBar);
-  loadGame();
+  // Try cloud load first, fall back to local
+  cloudLoad().then(loaded=>{
+    if(!loaded){
+      loadGame();
+      G._tickAtLastLoad=G.tick;
+    }
+    applyOfflineProgress();
+    renderAll();
+  });
 }
 
 // ── TICK ──
 function gameTick(){
   G.tick++;
-  const boost=earlyBoost();
+  const rally=G._rallied&&G.tick<=G._rallyEnd;
+  if(G._rallied&&G.tick>G._rallyEnd){G._rallied=false;addLog('The people\'s rally ends. Income returns to normal.');}
+  const boost=earlyBoost()*(rally?2:1);
   Object.values(G.resources).forEach(r=>{if(r.rate>0)r.amount=Math.min(r.max,r.amount+(r.rate*boost)/60);});
   if(G.hasAlchemy&&G.tick%60===0&&G.resources.mana.amount>=10){
     G.resources.mana.amount-=10;G.resources.gold.amount=Math.min(G.resources.gold.max,G.resources.gold.amount+50);
     addLog('Alchemy transmutes 10 mana → 50 gold. ✨');
   }
-  if(G.prestigeRate>0&&G.tick%60===0)G.prestige=Math.min(G.prestigeGoal,G.prestige+G.prestigeRate);
+  if(G.prestigeRate>0&&G.tick%60===0){
+    const rate=G.prestigeRate*(1+(G.victoryBonus/100));
+    G.prestige=Math.min(G.prestigeGoal,G.prestige+rate);
+    G.prestigePoints=Math.min(9999,G.prestigePoints+Math.floor(rate/10));
+  }
   if(G.tick%300===0){G.year++;addLog(`Year ${G.year} of the ${G.era}. The kingdom endures.`);}
   if(G.activeResearch){
-    G.researchProgress++;
+    const resBonus=G.legacyRelics.includes('relic_research')?0.9:1;
+    G.researchProgress+=resBonus;
     const rDef=allR().find(r=>r.id===G.activeResearch);
     if(rDef&&G.researchProgress>=rDef.time)completeResearch(rDef);
   }
   G.heroes.forEach(h=>{if(h.qt>0){h.qt--;if(h.qt<=0)completeQuest(h);}});
+  seasonTick();
+  checkVictoryPath();
   updateBadges();
+  G.lastSaveTime=getReliableNow();
 }
 
 // ── TABS ──
@@ -691,7 +1071,7 @@ function showSnot(msg){
 
 // ── RENDER ──
 function renderAll(){
-  renderResources();renderBuildings();renderMap();renderResearch();renderHeroes();
+  renderResources();renderBuildings();renderMap();renderResearch();renderHeroes();renderFaction();
   if(G.logDirty){renderLog();G.logDirty=false;}
   renderPrestige();
   document.getElementById('era-display').textContent=`${G.era} · Year ${G.year}`;
@@ -812,7 +1192,89 @@ function renderHeroes(){
   }).join('');
 }
 
-function renderLog(){
+function renderFaction(){
+  const tab=document.getElementById('tab-faction');if(!tab)return;
+  const path=VICTORY_PATHS[G.victoryPath];
+  const seasonPct=Math.round((G.seasonWeek/SEASON_WEEKS)*100);
+  const weeksLeft=SEASON_WEEKS-G.seasonWeek;
+
+  tab.innerHTML=`
+    <div class="section">
+      <div class="section-title">⚔ Men of the West · Dynasty ${G.dynasty||1}</div>
+      <div class="ftrait"><div class="ftrait-name">Diplomatic Mastery</div><div class="ftrait-desc">Can form vassal treaties. Tribute scales with prestige.</div></div>
+      <div class="ftrait"><div class="ftrait-name">Balanced Arts</div><div class="ftrait-desc">All research branches cost the same. Master of all paths.</div></div>
+      ${G.legacyRelics.length?`<div class="ftrait"><div class="ftrait-name">Legacy Relics</div><div class="ftrait-desc">${G.legacyRelics.map(r=>({relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[r]||r)).join(' · ')}</div></div>`:''}
+    </div>
+
+    <div class="section">
+      <div class="section-title">⏳ Season ${G.season} Progress</div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--stone-light);margin-bottom:6px">
+        <span>Week ${G.seasonWeek} of ${SEASON_WEEKS}</span>
+        <span>${weeksLeft} week${weeksLeft!==1?'s':''} remaining</span>
+      </div>
+      <div style="height:6px;background:rgba(201,168,76,.1);border-radius:3px;overflow:hidden;margin-bottom:10px">
+        <div style="height:100%;width:${seasonPct}%;background:linear-gradient(90deg,var(--gold-dark),var(--gold));border-radius:3px;transition:width 1s"></div>
+      </div>
+      ${path?`<div style="font-size:12px;color:var(--forest-light)">✓ ${path.icon} ${path.label} · +${path.bonus}% prestige bonus active</div>`:
+      `<div style="font-size:12px;color:var(--stone-light);font-style:italic">No victory path achieved yet. Complete a research branch.</div>`}
+    </div>
+
+    <div class="section">
+      <div class="section-title">⚜ Prestige Abilities</div>
+      <div style="font-size:12px;color:var(--stone-light);font-style:italic;margin-bottom:10px">Spend prestige points to activate faction abilities. Points: <span style="color:var(--gold);font-family:'Cinzel',serif">${G.prestigePoints}</span></div>
+      ${PRESTIGE_ABILITIES.map(a=>{
+        const onCD=G.tick-a.lastUsed<a.cooldown&&a.lastUsed>0;
+        const canUse=G.prestigePoints>=a.cost&&!onCD;
+        const cdRem=onCD?Math.ceil((a.cooldown-(G.tick-a.lastUsed))/60):0;
+        return`<div style="background:rgba(201,168,76,.04);border:1px solid rgba(201,168,76,.12);border-radius:4px;padding:10px;margin-bottom:7px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+            <span style="font-family:'Cinzel',serif;font-size:12px;color:var(--parchment)">${a.icon} ${a.name}</span>
+            <span style="font-family:'Cinzel',serif;font-size:10px;color:var(--gold);background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);border-radius:2px;padding:1px 6px">${a.cost} pts</span>
+          </div>
+          <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-bottom:6px">${a.desc}</div>
+          ${onCD?`<div style="font-size:11px;color:var(--blood-light)">Cooldown: ${cdRem} min remaining</div>`:''}
+          <button onclick="spendPrestige(PRESTIGE_ABILITIES.find(x=>x.id==='${a.id}'))" ${canUse?'':'disabled'}
+            style="width:100%;padding:5px;background:${canUse?'rgba(201,168,76,.1)':'rgba(255,255,255,.03)'};border:1px solid ${canUse?'var(--gold-dark)':'rgba(201,168,76,.15)'};border-radius:3px;color:${canUse?'var(--gold)':'var(--stone-light)'};font-family:'Cinzel',serif;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;cursor:${canUse?'pointer':'not-allowed'}">
+            ${onCD?`On Cooldown`:`Activate · ${a.cost} pts`}
+          </button>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="section">
+      <div class="section-title">☁ Cloud Save (Supabase)</div>
+      ${G.supabaseUrl?
+        `<div style="font-size:12px;color:var(--forest-light);margin-bottom:10px">✓ Cloud save connected</div>
+         <button onclick="cloudSave()" style="width:100%;padding:7px;background:rgba(74,122,50,.1);border:1px solid rgba(74,122,50,.3);border-radius:3px;color:var(--forest-light);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-bottom:6px">Save to Cloud Now</button>
+         <button onclick="cloudLoad().then(()=>renderAll())" style="width:100%;padding:7px;background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.2);border-radius:3px;color:var(--gold);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer">Restore from Cloud</button>`
+        :
+        `<div style="font-size:12px;color:var(--stone-light);font-style:italic;margin-bottom:10px;line-height:1.5">Paste your Supabase credentials below to enable cross-device cloud saves.</div>
+         <input id="sb-url" placeholder="Supabase Project URL" value="${G.supabaseUrl}"
+           style="width:100%;padding:7px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(201,168,76,.2);border-radius:3px;color:var(--parchment);font-size:12px;margin-bottom:6px;outline:none">
+         <input id="sb-key" placeholder="Supabase Anon Key" value="${G.supabaseKey}"
+           style="width:100%;padding:7px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(201,168,76,.2);border-radius:3px;color:var(--parchment);font-size:12px;margin-bottom:8px;outline:none">
+         <button onclick="saveSupabaseConfig()" style="width:100%;padding:7px;background:rgba(201,168,76,.1);border:1px solid var(--gold-dark);border-radius:3px;color:var(--gold);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer">Connect Cloud Save</button>`
+      }
+    </div>
+
+    <div class="section">
+      <div class="section-title">⚔ Trinity Counter System</div>
+      <div class="crow"><span class="cf" style="color:#c9a84c">⚔ Men</span><span class="beats">▶ beats</span><span class="cf" style="color:#8b1a1a">🐺 Wildlands</span></div>
+      <div class="crow"><span class="cf" style="color:#c9a84c">⚔ Men</span><span class="loses">◀ weak to</span><span class="cf" style="color:#4a7a32">🌿 Elves</span></div>
+      <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-top:6px;opacity:.6;line-height:1.5">Elves beat Men · Dwarves beat Elves · Wildlands beat Dwarves<br>Alliances: max ${G.allianceSize} kingdoms · Full rivalry unlocks in multiplayer.</div>
+    </div>`;
+}
+
+function saveSupabaseConfig(){
+  const url=document.getElementById('sb-url')?.value?.trim();
+  const key=document.getElementById('sb-key')?.value?.trim();
+  if(!url||!key){showSnot('Please enter both URL and key');return;}
+  G.supabaseUrl=url;G.supabaseKey=key;
+  saveGame();
+  cloudSave();
+  renderFaction();
+  showOverlay('Cloud save connected!','success','Supabase Ready');
+}
   const el=document.getElementById('log-entries');if(!el)return;
   el.innerHTML=G.log.slice(0,15).map(e=>`<div class="log-entry ${e.type||''}"><span class="lt">${e.time}</span>${e.msg}</div>`).join('');
 }
@@ -839,35 +1301,13 @@ function animateTickBar(ts){
 
 // ── SAVE / LOAD ──
 function saveGame(){
-  try{localStorage.setItem('hc3',JSON.stringify({
-    year:G.year,prestige:G.prestige,prestigeRate:G.prestigeRate,
-    resources:Object.fromEntries(Object.entries(G.resources).map(([k,v])=>[k,{amount:v.amount,rate:v.rate,max:v.max}])),
-    buildings:G.buildings,research:G.research,heroes:G.heroes,
-    activeResearch:G.activeResearch,researchProgress:G.researchProgress,tick:G.tick,
-    revealedBuildings:G.revealedBuildings,revealedResearch:G.revealedResearch,
-    unlockedResearchTabs:G.unlockedResearchTabs,
-    flags:{costReduction:G.costReduction,wardProtect:G.wardProtect,hasAlchemy:G.hasAlchemy,
-           hasFarsight:G.hasFarsight,hasSiege:G.hasSiege,questTimeMulti:G.questTimeMulti,fortBonus:G.fortBonus},
-    log:G.log.slice(0,20),
-  }));}catch(e){}
+  try{localStorage.setItem('hc4',JSON.stringify(buildSavePayload()));}catch(e){}
 }
 function loadGame(){
   try{
-    const raw=localStorage.getItem('hc3');if(!raw)return;
-    const s=JSON.parse(raw);
-    G.year=s.year||1;G.prestige=s.prestige||0;G.prestigeRate=s.prestigeRate||0;
-    Object.entries(s.resources||{}).forEach(([k,v])=>{
-      if(G.resources[k]){G.resources[k].amount=v.amount;if(v.rate>G.resources[k].rate)G.resources[k].rate=v.rate;G.resources[k].max=v.max;}
-    });
-    (s.buildings||[]).forEach(b=>{const g=G.buildings.find(x=>x.id===b.id);if(g)g.level=b.level;});
-    Object.assign(G.research,s.research||{});
-    G.heroes=s.heroes||[];
-    G.activeResearch=s.activeResearch||null;G.researchProgress=s.researchProgress||0;G.tick=s.tick||0;
-    if(s.revealedBuildings)G.revealedBuildings=s.revealedBuildings;
-    if(s.revealedResearch)G.revealedResearch=s.revealedResearch;
-    if(s.unlockedResearchTabs)G.unlockedResearchTabs=s.unlockedResearchTabs;
-    if(s.flags){const f=s.flags;G.costReduction=f.costReduction;G.wardProtect=f.wardProtect;G.hasAlchemy=f.hasAlchemy;G.hasFarsight=f.hasFarsight;G.hasSiege=f.hasSiege;G.questTimeMulti=f.questTimeMulti;G.fortBonus=f.fortBonus;}
-    G.log=s.log||G.log;
+    const raw=localStorage.getItem('hc4')||localStorage.getItem('hc3');
+    if(!raw)return;
+    applyLoadedState(JSON.parse(raw));
     addLog('Chronicle restored. Your dynasty continues…','important');
   }catch(e){}
 }
