@@ -875,13 +875,18 @@ function init(){
   G.mapTiles=MAP_DEF.map(t=>({...t}));
   addLog('Your kingdom of Arnethia rises from humble beginnings.','important');
   addLog('Build farms and mills. Discover what lies ahead.');
+
+  // iOS Safari fix — attach touchend listeners to all tab buttons
+  // This fires before the 300ms click delay and works reliably on iOS
+  document.addEventListener('DOMContentLoaded',()=>attachTabTouch());
+  setTimeout(attachTabTouch, 100); // fallback if DOMContentLoaded already fired
+
   renderAll();
   setInterval(gameTick,1000);
   setInterval(renderAll,3000);
   setInterval(saveGame,30000);
-  setInterval(()=>cloudSave(),120000); // cloud save every 2 min
+  setInterval(()=>cloudSave(),120000);
   requestAnimationFrame(animateTickBar);
-  // Try cloud load first, fall back to local
   cloudLoad().then(loaded=>{
     if(!loaded){
       loadGame();
@@ -890,6 +895,21 @@ function init(){
     applyOfflineProgress();
     renderAll();
   });
+}
+
+function attachTabTouch(){
+  document.querySelectorAll('.btab, .stab').forEach(btn=>{
+    // Remove any existing listener first to avoid doubles
+    btn.removeEventListener('touchend', tabTouchHandler);
+    btn.addEventListener('touchend', tabTouchHandler, {passive:false});
+  });
+}
+
+function tabTouchHandler(e){
+  e.preventDefault(); // prevent ghost click
+  e.stopPropagation();
+  const tab=this.dataset.tab;
+  if(tab) switchTab(tab);
 }
 
 // ── TICK ──
