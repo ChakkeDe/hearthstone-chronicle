@@ -98,15 +98,15 @@ body::before{content:'';position:fixed;inset:0;
   padding-left:env(safe-area-inset-left);
   padding-right:env(safe-area-inset-right);}
 .btab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  cursor:pointer;transition:background .15s;font-size:21px;gap:2px;position:relative;
+  cursor:pointer;transition:background .15s;font-size:18px;gap:1px;position:relative;
   background:none;border:none;color:inherit;font-family:inherit;
-  min-height:44px;min-width:44px;
+  min-height:44px;min-width:0;
   -webkit-tap-highlight-color:rgba(201,168,76,.25);
   touch-action:manipulation;}
-.btab .blabel{font-family:'Cinzel',serif;font-size:8px;color:var(--gold-dark);letter-spacing:.5px;}
+.btab .blabel{font-family:'Cinzel',serif;font-size:7px;color:var(--gold-dark);letter-spacing:.3px;}
 .btab.active .blabel{color:var(--gold);}
 .btab.active{background:rgba(201,168,76,.1);}
-.btab .bdot{position:absolute;top:5px;right:calc(50% - 16px);width:8px;height:8px;border-radius:50%;
+.btab .bdot{position:absolute;top:5px;right:calc(50% - 14px);width:7px;height:7px;border-radius:50%;
   background:var(--blood-light);border:1px solid #0d0a06;display:none;}
 .btab .bdot.on{display:block;}
 
@@ -458,7 +458,54 @@ function earlyBoost(){
   return Math.max(1,5-t*0.4);
 }
 
-// ── OFFLINE PROGRESS ──
+const APP_VERSION = '0.6.0';
+
+// ── UPDATE CHECKER ──
+function checkForUpdate(){
+  if(!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.ready.then(reg=>{
+    reg.addEventListener('updatefound',()=>{
+      const newWorker=reg.installing;
+      newWorker.addEventListener('statechange',()=>{
+        if(newWorker.state==='installed'&&navigator.serviceWorker.controller){
+          showUpdateBanner();
+        }
+      });
+    });
+    reg.update();
+  });
+}
+
+function showUpdateBanner(){
+  const el=document.createElement('div');
+  el.id='update-banner';
+  el.style.cssText=`position:fixed;bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 8px);
+    left:50%;transform:translateX(-50%);
+    background:rgba(10,8,4,.97);border:1px solid var(--gold);border-radius:6px;
+    padding:10px 16px;z-index:9998;display:flex;align-items:center;gap:12px;
+    font-family:'Cinzel',serif;font-size:12px;color:var(--gold-light);
+    box-shadow:0 4px 20px rgba(0,0,0,.6);white-space:nowrap;`;
+  el.innerHTML=`
+    <span>✦ New version available</span>
+    <button onclick="applyUpdate()" style="background:rgba(201,168,76,.2);border:1px solid var(--gold);
+      border-radius:3px;padding:4px 10px;color:var(--gold);font-family:'Cinzel',serif;
+      font-size:10px;letter-spacing:1px;cursor:pointer;touch-action:manipulation;">Update</button>
+    <button onclick="this.parentElement.remove()" style="background:none;border:none;
+      color:var(--stone-light);font-size:16px;cursor:pointer;padding:0 4px;touch-action:manipulation;">✕</button>`;
+  document.body.appendChild(el);
+}
+
+function applyUpdate(){
+  navigator.serviceWorker.ready.then(reg=>{
+    if(reg.waiting){
+      reg.waiting.postMessage({type:'SKIP_WAITING'});
+    }
+  });
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    saveGame();
+    window.location.reload();
+  });
+}
 // Security model:
 // 1. If Supabase connected: use server's updated_at timestamp (unfakeable)
 // 2. If local only: cross-check local clock delta against tick count to detect manipulation
@@ -1291,6 +1338,7 @@ function init(){
   setInterval(saveGame,30000);
   setInterval(()=>cloudSave(),120000);
   requestAnimationFrame(animateTickBar);
+  checkForUpdate();
   cloudLoad().then(loaded=>{
     if(!loaded){
       loadGame();

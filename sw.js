@@ -1,4 +1,4 @@
-const CACHE = 'hc-v5';
+const CACHE = 'hc-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -10,7 +10,7 @@ self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(c => c.addAll(ASSETS).catch(() => {}))
   );
-  self.skipWaiting();
+  // Don't skip waiting automatically — wait for user confirmation
 });
 
 self.addEventListener('activate', e => {
@@ -26,4 +26,11 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => cached))
   );
+});
+
+// Listen for skip waiting message from the app
+self.addEventListener('message', e => {
+  if(e.data && e.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
