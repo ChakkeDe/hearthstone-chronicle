@@ -253,7 +253,47 @@ body::before{content:'';position:fixed;inset:0;
   12%{opacity:1;transform:translateX(-50%) translateY(0)}
   75%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-5px)}}
 
-::-webkit-scrollbar{width:3px;}
+/* COMBAT */
+.troop-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.tcard{background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.1);border-radius:4px;padding:10px;}
+.tcard-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.tcard-name{font-family:'Cinzel',serif;font-size:11px;color:var(--parchment);}
+.tcard-icon{font-size:18px;}
+.tcard-stats{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:6px;}
+.tstat{background:rgba(255,255,255,.03);border-radius:3px;padding:3px 5px;text-align:center;}
+.tstat-v{font-family:'Cinzel',serif;font-size:12px;color:var(--parchment);}
+.tstat-l{font-size:8px;color:var(--stone-light);text-transform:uppercase;letter-spacing:.5px;}
+.tstat-v.injured{color:var(--blood-light);}
+.tstat-v.training{color:var(--gold);}
+.train-btn{width:100%;padding:5px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);
+  border-radius:3px;color:var(--gold);font-family:'Cinzel',serif;font-size:9px;
+  letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s;}
+.train-btn:hover:not(:disabled){background:rgba(201,168,76,.18);border-color:var(--gold);}
+.train-btn:disabled{opacity:.35;cursor:not-allowed;}
+.npc-list{display:flex;flex-direction:column;gap:7px;}
+.npc-card{background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.1);border-radius:4px;padding:10px;}
+.npc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.npc-name{font-family:'Cinzel',serif;font-size:11px;color:var(--parchment);}
+.npc-level{font-size:9px;color:var(--gold);background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);border-radius:2px;padding:1px 5px;font-family:'Cinzel',serif;}
+.npc-loot{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:11px;color:var(--stone-light);}
+.npc-defence{font-size:11px;color:var(--blood-light);font-style:italic;margin-bottom:6px;}
+.attack-btn{width:100%;padding:5px;background:rgba(139,26,26,.12);border:1px solid rgba(139,26,26,.35);
+  border-radius:3px;color:#d4826a;font-family:'Cinzel',serif;font-size:9px;
+  letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s;}
+.attack-btn:hover:not(:disabled){background:rgba(139,26,26,.28);border-color:var(--blood-light);}
+.attack-btn:disabled{opacity:.35;cursor:not-allowed;}
+.raid-card{background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.15);border-radius:4px;padding:10px;margin-bottom:7px;}
+.raid-progress{height:3px;background:rgba(201,168,76,.1);border-radius:2px;overflow:hidden;margin-top:6px;}
+.raid-progress-inner{height:100%;background:linear-gradient(90deg,var(--blood-light),var(--gold));border-radius:2px;transition:width .5s;}
+.hospital-card{background:rgba(74,122,50,.05);border:1px solid rgba(74,122,50,.2);border-radius:4px;padding:10px;margin-bottom:8px;}
+.combat-log{max-height:140px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;}
+.clog-entry{font-size:12px;color:var(--stone-light);font-style:italic;padding:3px 0;border-bottom:1px solid rgba(201,168,76,.05);line-height:1.4;}
+.clog-entry.victory{color:var(--forest-light);}
+.clog-entry.defeat{color:var(--blood-light);}
+.troop-send{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;}
+.send-input{background:rgba(255,255,255,.04);border:1px solid rgba(201,168,76,.2);border-radius:3px;
+  padding:5px 7px;color:var(--parchment);font-size:12px;width:100%;font-family:'Crimson Text',serif;}
+.send-label{font-family:'Cinzel',serif;font-size:9px;color:var(--gold-dark);letter-spacing:.5px;margin-bottom:3px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:rgba(201,168,76,.18);border-radius:2px;}
 </style>
@@ -291,7 +331,8 @@ body::before{content:'';position:fixed;inset:0;
     <button class="stab active" data-tab="kingdom" onclick="switchTab('kingdom')">🏰<span class="slabel">Kingdom</span></button>
     <button class="stab" data-tab="build" onclick="switchTab('build')">🏗<span class="slabel">Build</span><span class="bdot" id="bdot-build"></span></button>
     <button class="stab" data-tab="research" onclick="switchTab('research')">📚<span class="slabel">Research</span><span class="bdot" id="bdot-research"></span></button>
-    <button class="stab" data-tab="heroes" onclick="switchTab('heroes')">⚔<span class="slabel">Heroes</span><span class="bdot" id="bdot-heroes"></span></button>
+    <button class="stab" data-tab="combat" onclick="switchTab('combat')">⚔<span class="slabel">Combat</span><span class="bdot" id="bdot-combat"></span></button>
+    <button class="stab" data-tab="heroes" onclick="switchTab('heroes')">🦸<span class="slabel">Heroes</span><span class="bdot" id="bdot-heroes"></span></button>
     <button class="stab" data-tab="faction" onclick="switchTab('faction')">⚜<span class="slabel">Faction</span></button>
   </div>
 
@@ -343,6 +384,9 @@ body::before{content:'';position:fixed;inset:0;
       </div>
     </div>
 
+    <!-- COMBAT TAB -->
+    <div class="tab-view" id="tab-combat"></div>
+
     <!-- FACTION TAB -->
     <div class="tab-view" id="tab-faction">
     </div>
@@ -355,7 +399,8 @@ body::before{content:'';position:fixed;inset:0;
     <button class="btab active" data-tab="kingdom" onclick="switchTab('kingdom')">🏰<span class="blabel">Kingdom</span></button>
     <button class="btab" data-tab="build" onclick="switchTab('build')">🏗<span class="blabel">Build</span><span class="bdot" id="mbdot-build"></span></button>
     <button class="btab" data-tab="research" onclick="switchTab('research')">📚<span class="blabel">Research</span><span class="bdot" id="mbdot-research"></span></button>
-    <button class="btab" data-tab="heroes" onclick="switchTab('heroes')">⚔<span class="blabel">Heroes</span><span class="bdot" id="mbdot-heroes"></span></button>
+    <button class="btab" data-tab="combat" onclick="switchTab('combat')">⚔<span class="blabel">Combat</span><span class="bdot" id="mbdot-combat"></span></button>
+    <button class="btab" data-tab="heroes" onclick="switchTab('heroes')">🦸<span class="blabel">Heroes</span><span class="bdot" id="mbdot-heroes"></span></button>
     <button class="btab" data-tab="faction" onclick="switchTab('faction')">⚜<span class="blabel">Faction</span></button>
   </div>
 </div>
@@ -392,6 +437,17 @@ const G={
   unlockedResearchTabs:['economy','military'],
   costReduction:null,wardProtect:false,hasAlchemy:false,
   hasFarsight:false,hasSiege:false,questTimeMulti:null,fortBonus:0,
+  // ── COMBAT STATE ──
+  troops:{
+    infantry:{total:0,available:0,injured:0,training:0,trainEnd:0},
+    archers: {total:0,available:0,injured:0,training:0,trainEnd:0},
+    cavalry: {total:0,available:0,injured:0,training:0,trainEnd:0},
+    siege:   {total:0,available:0,injured:0,training:0,trainEnd:0},
+  },
+  hospital:{capacity:50,recovering:0,recoverEnd:0},
+  npcFarms:[],
+  activeRaids:[],
+  combatLog:[],
   // Supabase config — user fills these in
   supabaseUrl:'',
   supabaseKey:'',
@@ -732,6 +788,8 @@ function buildSavePayload(){
     unlockedResearchTabs:G.unlockedResearchTabs,
     flags:{costReduction:G.costReduction,wardProtect:G.wardProtect,hasAlchemy:G.hasAlchemy,
            hasFarsight:G.hasFarsight,hasSiege:G.hasSiege,questTimeMulti:G.questTimeMulti,fortBonus:G.fortBonus},
+    troops:G.troops,hospital:G.hospital,npcFarms:G.npcFarms,
+    activeRaids:G.activeRaids,combatLog:G.combatLog,
     supabaseUrl:G.supabaseUrl,supabaseKey:G.supabaseKey,
     log:G.log.slice(0,20),
   };
@@ -757,6 +815,11 @@ function applyLoadedState(s){
   if(s.revealedResearch)G.revealedResearch=s.revealedResearch;
   if(s.unlockedResearchTabs)G.unlockedResearchTabs=s.unlockedResearchTabs;
   if(s.flags){const f=s.flags;G.costReduction=f.costReduction;G.wardProtect=f.wardProtect;G.hasAlchemy=f.hasAlchemy;G.hasFarsight=f.hasFarsight;G.hasSiege=f.hasSiege;G.questTimeMulti=f.questTimeMulti;G.fortBonus=f.fortBonus;}
+  if(s.troops)Object.assign(G.troops,s.troops);
+  if(s.hospital)Object.assign(G.hospital,s.hospital);
+  if(s.npcFarms)G.npcFarms=s.npcFarms;
+  if(s.activeRaids)G.activeRaids=s.activeRaids;
+  if(s.combatLog)G.combatLog=s.combatLog;
   if(s.supabaseUrl)G.supabaseUrl=s.supabaseUrl;
   if(s.supabaseKey)G.supabaseKey=s.supabaseKey;
   G.log=s.log||G.log;
@@ -791,6 +854,10 @@ const BD=[
    eff:l=>`+${l*200} all caps, +${l*20} prestige/min`,cost:l=>({gold:100*l,stone:80*l,iron:30*l,wood:60*l}),
    onBuild:l=>{Object.values(G.resources).forEach(r=>r.max+=200);G.prestigeRate=(G.prestigeRate||0)+20;revealR(['envoys']);unlockTab('diplomacy');},
    req:{barracks:2,tower:1}},
+  {id:'hospital',name:'Field Hospital',icon:'🏥',max:4,tier:3,desc:'Treats wounded soldiers. Increases recovery capacity.',
+   eff:l=>`Recover up to ${50+l*50} troops. ${l*20}% faster healing.`,cost:l=>({wood:30*l,stone:25*l,food:20*l}),
+   onBuild:l=>{G.hospital.capacity=50+l*50;},
+   req:{barracks:1}},
 ];
 
 const RD={
@@ -836,7 +903,323 @@ const RD={
   ],
 };
 
-const allR=()=>[...RD.economy,...RD.military,...RD.arcane,...RD.diplomacy];
+// ── COMBAT DEFINITIONS ──
+const TROOP_DEF={
+  infantry:{name:'Infantry',icon:'🗡',atk:10,def:15,carry:20,speed:60, trainTime:30,cost:{food:10,iron:5},  reqBarracks:1,desc:'Sturdy front-line fighters. Strong defence.'},
+  archers: {name:'Archers', icon:'🏹',atk:14,def:8, carry:15,speed:90, trainTime:45,cost:{wood:15,iron:8},  reqBarracks:2,desc:'Ranged attackers. High loot efficiency.'},
+  cavalry: {name:'Cavalry', icon:'🐎',atk:20,def:12,carry:40,speed:45, trainTime:90,cost:{food:20,iron:15}, reqBarracks:3,desc:'Fast raiders. Best loot capacity.'},
+  siege:   {name:'Siege',   icon:'🏹',atk:35,def:5, carry:10,speed:120,trainTime:180,cost:{wood:40,iron:30},reqBarracks:4,desc:'Destroys walls. PvP only — no NPC use.'},
+};
+
+const NPC_FARMS=[
+  {id:'n1',name:'Peasant Village',icon:'🏘',level:1,def:20, loot:{gold:30,food:40,wood:20},respawn:300,available:true,respawnAt:0},
+  {id:'n2',name:'Abandoned Fort',  icon:'🏚',level:2,def:50, loot:{gold:60,iron:20,wood:30},respawn:480,available:true,respawnAt:0},
+  {id:'n3',name:'River Crossing',  icon:'🌊',level:2,def:40, loot:{food:80,wood:50},respawn:420,available:true,respawnAt:0},
+  {id:'n4',name:'Bandit Camp',     icon:'⛺',level:3,def:100,loot:{gold:100,iron:40},respawn:600,available:true,respawnAt:0},
+  {id:'n5',name:'Ancient Ruins',   icon:'🗺',level:4,def:200,loot:{gold:150,mana:20,iron:60},respawn:900,available:true,respawnAt:0},
+  {id:'n6',name:'Orc Stronghold',  icon:'🏯',level:5,def:400,loot:{gold:200,iron:100,food:80},respawn:1200,available:true,respawnAt:0},
+];
+
+function initCombat(){
+  G.npcFarms=NPC_FARMS.map(f=>({...f}));
+}
+
+// ── TROOP TRAINING ──
+function trainTroops(type,qty){
+  const def=TROOP_DEF[type];
+  if(!def)return;
+  const barracksLvl=blvl('barracks');
+  if(barracksLvl<def.reqBarracks){showSnot(`Requires Barracks level ${def.reqBarracks}`);return;}
+  const t=G.troops[type];
+  if(t.training>0){showSnot('Already training this unit type');return;}
+  const cost={};
+  Object.entries(def.cost).forEach(([r,v])=>cost[r]=v*qty);
+  if(!canAfford(cost)){showSnot('Insufficient resources');return;}
+  spend(cost);
+  t.training=qty;
+  t.trainEnd=G.tick+(def.trainTime*qty);
+  addLog(`Training ${qty} ${def.name}. Ready in ${Math.round(def.trainTime*qty/60)} min.`);
+  renderCombat();
+}
+
+function checkTraining(){
+  Object.entries(G.troops).forEach(([type,t])=>{
+    if(t.training>0&&G.tick>=t.trainEnd){
+      t.available+=t.training;
+      t.total+=t.training;
+      addLog(`${t.training} ${TROOP_DEF[type].name} are ready for battle!`,'important');
+      showOverlay(`${t.training} ${TROOP_DEF[type].name} ready!`,'success','Training Complete');
+      setBadge('combat',G.activeTab!=='combat');
+      t.training=0;t.trainEnd=0;
+    }
+  });
+}
+
+// ── NPC FARM ATTACK ──
+function calcAttackPower(sent){
+  return Object.entries(sent).reduce((sum,[type,qty])=>{
+    return sum+(TROOP_DEF[type]?.atk||0)*qty;
+  },0);
+}
+
+function calcLootCapacity(sent){
+  return Object.entries(sent).reduce((sum,[type,qty])=>{
+    return sum+(TROOP_DEF[type]?.carry||0)*qty;
+  },0);
+}
+
+function attackNPC(farmId,sent){
+  const farm=G.npcFarms.find(f=>f.id===farmId);
+  if(!farm||!farm.available){showSnot('Target not available');return;}
+  const totalSent=Object.values(sent).reduce((a,b)=>a+b,0);
+  if(totalSent===0){showSnot('Select troops to send');return;}
+
+  // Check availability
+  for(const[type,qty]of Object.entries(sent)){
+    if(qty>G.troops[type].available){showSnot(`Not enough ${TROOP_DEF[type].name} available`);return;}
+  }
+
+  // Deduct troops
+  Object.entries(sent).forEach(([type,qty])=>{G.troops[type].available-=qty;});
+
+  // Calculate travel time based on slowest unit
+  const slowest=Math.max(...Object.entries(sent).filter(([,q])=>q>0).map(([t])=>TROOP_DEF[t].speed));
+  const travelTime=slowest+farm.level*20;
+
+  const raid={
+    id:'r'+G.tick,type:'npc',farmId,sent,
+    returnAt:G.tick+(travelTime*2),
+    travelTime,farm:{...farm},
+  };
+  G.activeRaids.push(raid);
+  farm.available=false;
+  farm.respawnAt=G.tick+farm.respawn;
+  addLog(`Troops march on ${farm.name}. Return in ${Math.round(travelTime*2/60)} min.`);
+  renderCombat();
+}
+
+function resolveRaid(raid){
+  const atkPow=calcAttackPower(raid.sent);
+  const farm=raid.farm;
+  const victory=atkPow>=farm.def;
+
+  if(victory){
+    // Loot calculation
+    const cap=calcLootCapacity(raid.sent);
+    let lootTotal=Object.values(farm.loot).reduce((a,b)=>a+b,0);
+    const lootRatio=Math.min(1,cap/lootTotal);
+    const loot={};
+    Object.entries(farm.loot).forEach(([res,amt])=>{
+      loot[res]=Math.floor(amt*lootRatio);
+      if(G.resources[res])G.resources[res].amount=Math.min(G.resources[res].max,G.resources[res].amount+loot[res]);
+    });
+
+    // NPC — troops injured not killed
+    const injuryRate=Math.max(0,(farm.def/atkPow)*0.3);
+    let totalInjured=0;
+    Object.entries(raid.sent).forEach(([type,qty])=>{
+      const injured=Math.floor(qty*injuryRate);
+      totalInjured+=injured;
+      G.troops[type].available+=qty-injured;
+      G.troops[type].injured+=injured;
+      // hospital recovery
+    });
+
+    const lootStr=Object.entries(loot).map(([r,v])=>`${G.resources[r]?.icon||r}${v}`).join(' ');
+    addLog(`Victory at ${farm.name}! Loot: ${lootStr}. Injured: ${totalInjured}.`,'important');
+    G.combatLog.unshift({msg:`✓ ${farm.name} — ${lootStr}`,type:'victory',time:`Yr.${G.year}`});
+    G.prestige+=10;
+    if(totalInjured>0) recoverInjured(totalInjured);
+
+  } else {
+    // Defeat — all troops injured (NPC so no permanent death)
+    let totalInjured=0;
+    Object.entries(raid.sent).forEach(([type,qty])=>{
+      G.troops[type].injured+=qty;
+      totalInjured+=qty;
+    });
+    addLog(`⚠ Defeated at ${farm.name}. ${totalInjured} troops injured.`,'danger');
+    G.combatLog.unshift({msg:`✗ ${farm.name} — repelled, ${totalInjured} injured`,type:'defeat',time:`Yr.${G.year}`});
+    if(totalInjured>0) recoverInjured(totalInjured);
+  }
+
+  G.combatLog=G.combatLog.slice(0,20);
+  G.activeRaids=G.activeRaids.filter(r=>r.id!==raid.id);
+  setBadge('combat',G.activeTab!=='combat');
+  renderCombat();
+}
+
+// ── HOSPITAL RECOVERY ──
+function recoverInjured(count){
+  const hospitalLvl=blvl('hospital')||0;
+  const cap=50+(hospitalLvl*50);
+  const canRecover=Math.min(count,cap-G.hospital.recovering);
+  if(canRecover<=0){addLog('Hospital full — some troops could not be recovered.','danger');return;}
+  G.hospital.recovering+=canRecover;
+  const recoverTime=canRecover*10; // 10 ticks per troop
+  G.hospital.recoverEnd=Math.max(G.hospital.recoverEnd,G.tick+recoverTime);
+}
+
+function checkRecovery(){
+  if(G.hospital.recovering>0&&G.tick>=G.hospital.recoverEnd){
+    // Return injured to available
+    let remaining=G.hospital.recovering;
+    Object.values(G.troops).forEach(t=>{
+      const ret=Math.min(t.injured,remaining);
+      t.injured-=ret;t.available+=ret;remaining-=ret;
+    });
+    addLog(`${G.hospital.recovering} troops recover from their injuries.`,'important');
+    showOverlay(`${G.hospital.recovering} troops recovered!`,'success','Hospital');
+    G.hospital.recovering=0;
+    setBadge('combat',G.activeTab!=='combat');
+  }
+}
+
+function checkNPCRespawn(){
+  G.npcFarms.forEach(f=>{
+    if(!f.available&&G.tick>=f.respawnAt){f.available=true;}
+  });
+}
+
+// ── RENDER COMBAT ──
+function renderCombat(){
+  const tab=document.getElementById('tab-combat');if(!tab)return;
+  const barracksLvl=blvl('barracks');
+
+  if(barracksLvl===0){
+    tab.innerHTML=`<div class="section"><div class="section-title">⚔ Combat</div>
+      <div style="font-size:13px;color:var(--stone-light);font-style:italic;padding:8px 0">
+        Build the King's Barracks to raise an army.
+      </div></div>`;
+    return;
+  }
+
+  const troopsHtml=Object.entries(TROOP_DEF).map(([type,def])=>{
+    const t=G.troops[type];
+    const unlocked=barracksLvl>=def.reqBarracks;
+    if(!unlocked) return`<div class="tcard" style="opacity:.4">
+      <div class="tcard-header"><span class="tcard-icon">${def.icon}</span>
+      <span class="tcard-name" style="font-size:9px">Req. Barracks ${def.reqBarracks}</span></div>
+      <div style="font-size:10px;color:var(--stone-light);font-style:italic">${def.name} — locked</div>
+    </div>`;
+    const trainPct=t.training>0?Math.round(((G.tick-(t.trainEnd-TROOP_DEF[type].trainTime*t.training))/(TROOP_DEF[type].trainTime*t.training))*100):0;
+    const minsLeft=t.training>0?Math.ceil((t.trainEnd-G.tick)/60):0;
+    return`<div class="tcard">
+      <div class="tcard-header"><span class="tcard-icon">${def.icon}</span><span class="tcard-name">${def.name}</span></div>
+      <div class="tcard-stats">
+        <div class="tstat"><div class="tstat-v">${t.available}</div><div class="tstat-l">Ready</div></div>
+        <div class="tstat"><div class="tstat-v ${t.injured?'injured':''}">${t.injured}</div><div class="tstat-l">Injured</div></div>
+      </div>
+      ${t.training>0?`<div style="font-size:10px;color:var(--gold);font-style:italic;margin-bottom:4px">Training ${t.training}… ${minsLeft}m left</div>
+        <div class="raid-progress"><div class="raid-progress-inner" style="width:${trainPct}%"></div></div>`:''}
+      <div style="display:flex;gap:4px;margin-top:6px">
+        <input type="number" id="train-qty-${type}" min="1" max="999" value="10"
+          style="width:50px;padding:4px;background:rgba(255,255,255,.04);border:1px solid rgba(201,168,76,.2);border-radius:3px;color:var(--parchment);font-size:11px;text-align:center;">
+        <button class="train-btn" onclick="trainFromInput('${type}')" ${t.training>0?'disabled':''} style="flex:1">
+          ${t.training>0?'Training…':'Train'}
+        </button>
+      </div>
+      <div style="font-size:9px;color:var(--stone-light);margin-top:3px">Cost/unit: ${Object.entries(def.cost).map(([r,v])=>`${G.resources[r]?.icon||r}${v}`).join(' ')}</div>
+    </div>`;
+  }).join('');
+
+  const hospitalLvl=blvl('hospital')||0;
+  const hospitalHtml=`<div class="hospital-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <span style="font-family:'Cinzel',serif;font-size:11px;color:var(--forest-light)">🏥 Hospital</span>
+      <span style="font-size:10px;color:var(--stone-light)">${hospitalLvl===0?'Not built':
+        `Capacity: ${50+hospitalLvl*50}`}</span>
+    </div>
+    ${G.hospital.recovering>0?
+      `<div style="font-size:11px;color:var(--forest-light)">${G.hospital.recovering} troops recovering…
+        ${Math.ceil((G.hospital.recoverEnd-G.tick)/60)}m remaining</div>
+        <div class="raid-progress" style="margin-top:4px"><div class="raid-progress-inner" style="width:${Math.round(((G.tick-(G.hospital.recoverEnd-G.hospital.recovering*10))/(G.hospital.recovering*10))*100)}%;background:var(--forest-light)"></div></div>`
+      :`<div style="font-size:11px;color:var(--stone-light);font-style:italic">${hospitalLvl===0?'Build a Hospital to recover injured troops faster.':'No troops recovering.'}</div>`
+    }
+  </div>`;
+
+  const activeRaidsHtml=G.activeRaids.length?`
+    <div class="section">
+      <div class="section-title">⏳ Active Raids</div>
+      ${G.activeRaids.map(r=>{
+        const pct=Math.round(((G.tick-(r.returnAt-r.travelTime*2))/(r.travelTime*2))*100);
+        const minsLeft=Math.ceil((r.returnAt-G.tick)/60);
+        return`<div class="raid-card">
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-family:'Cinzel',serif;font-size:11px;color:var(--parchment)">${r.farm.icon} ${r.farm.name}</span>
+            <span style="font-size:10px;color:var(--gold-dark)">${minsLeft}m</span>
+          </div>
+          <div style="font-size:10px;color:var(--stone-light);margin-top:2px">
+            ${Object.entries(r.sent).filter(([,q])=>q>0).map(([t,q])=>`${TROOP_DEF[t].icon}${q}`).join(' ')}
+          </div>
+          <div class="raid-progress"><div class="raid-progress-inner" style="width:${Math.min(100,pct)}%"></div></div>
+        </div>`;
+      }).join('')}
+    </div>`:'';
+
+  const npcHtml=G.npcFarms.map(farm=>{
+    const lootStr=Object.entries(farm.loot).map(([r,v])=>`${G.resources[r]?.icon||r}${v}`).join(' ');
+    const minsToRespawn=farm.available?0:Math.ceil((farm.respawnAt-G.tick)/60);
+    return`<div class="npc-card ${farm.available?'':''}">
+      <div class="npc-header">
+        <span class="npc-name">${farm.icon} ${farm.name}</span>
+        <span class="npc-level">Lv ${farm.level}</span>
+      </div>
+      <div class="npc-loot">Loot: ${lootStr}</div>
+      <div class="npc-defence">Defence: ${farm.def} power required</div>
+      ${!farm.available?
+        `<div style="font-size:11px;color:var(--stone-light);font-style:italic">Respawns in ${minsToRespawn}m</div>`
+        :`<div style="font-size:10px;color:var(--gold-dark);margin-bottom:6px;font-family:'Cinzel',serif">Send troops:</div>
+        <div class="troop-send">
+          ${Object.entries(TROOP_DEF).filter(([type])=>blvl('barracks')>=TROOP_DEF[type].reqBarracks&&type!=='siege').map(([type,def])=>`
+            <div>
+              <div class="send-label">${def.icon} ${def.name} (${G.troops[type].available})</div>
+              <input type="number" class="send-input" id="send-${farm.id}-${type}" min="0" max="${G.troops[type].available}" value="0" placeholder="0">
+            </div>`).join('')}
+        </div>
+        <button class="attack-btn" onclick="launchAttack('${farm.id}')">⚔ Attack</button>`
+      }
+    </div>`;
+  }).join('');
+
+  const combatLogHtml=G.combatLog.length?`
+    <div class="section">
+      <div class="section-title">📜 Battle Reports</div>
+      <div class="combat-log">
+        ${G.combatLog.map(e=>`<div class="clog-entry ${e.type||''}"><span style="font-size:9px;color:var(--gold-dark);font-family:'Cinzel',serif">${e.time}</span> ${e.msg}</div>`).join('')}
+      </div>
+    </div>`:'';
+
+  tab.innerHTML=`
+    <div class="section">
+      <div class="section-title">⚔ Army</div>
+      ${hospitalHtml}
+      <div class="troop-grid">${troopsHtml}</div>
+    </div>
+    ${activeRaidsHtml}
+    <div class="section">
+      <div class="section-title">🗺 NPC Farms</div>
+      <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-bottom:8px">Defeat NPC villages to steal resources. Troops are injured not killed.</div>
+      <div class="npc-list">${npcHtml}</div>
+    </div>
+    ${combatLogHtml}`;
+}
+
+function trainFromInput(type){
+  const el=document.getElementById('train-qty-'+type);
+  const qty=parseInt(el?.value)||1;
+  trainTroops(type,Math.max(1,qty));
+}
+
+function launchAttack(farmId){
+  const farm=G.npcFarms.find(f=>f.id===farmId);if(!farm)return;
+  const sent={};
+  Object.keys(TROOP_DEF).forEach(type=>{
+    const el=document.getElementById(`send-${farmId}-${type}`);
+    sent[type]=parseInt(el?.value)||0;
+  });
+  attackNPC(farmId,sent);
+}
 
 const HERO_NAMES=['Aldric the Bold','Seraphina Dawnblade','Torren Ironfist','Lyra Swiftarrow','Caelen of the Vale'];
 const HERO_CLS=['Knight','Ranger','Mage','Warrior','Scout'];
@@ -855,6 +1238,9 @@ const MAP_DEF=[
   {icon:'🛤',lbl:'Roads'},{icon:'🌲',lbl:'Forest'},{icon:'🏔',lbl:'Highlands'},
   {icon:'🌊',lbl:'River'},{icon:'⛺',lbl:'Outpost'},{icon:'🗺',lbl:'Ruins'},{icon:'🌅',lbl:'Borderlands'},
 ];
+
+// ── RESEARCH HELPERS ──
+const allR=()=>[...RD.economy,...RD.military,...RD.arcane,...RD.diplomacy];
 
 // ── PROGRESSIVE DISCLOSURE ──
 function revealB(id){
@@ -890,6 +1276,7 @@ function init(){
   BD.forEach(b=>G.buildings.push({id:b.id,level:0}));
   allR().forEach(r=>{ G.research[r.id]={completed:false}; });
   G.mapTiles=MAP_DEF.map(t=>({...t}));
+  initCombat();
   addLog('Your kingdom of Arnethia rises from humble beginnings.','important');
   addLog('Build farms and mills. Discover what lies ahead.');
 
@@ -953,6 +1340,11 @@ function gameTick(){
     if(rDef&&G.researchProgress>=rDef.time)completeResearch(rDef);
   }
   G.heroes.forEach(h=>{if(h.qt>0){h.qt--;if(h.qt<=0)completeQuest(h);}});
+  // Combat checks
+  checkTraining();
+  checkRecovery();
+  checkNPCRespawn();
+  G.activeRaids.forEach(r=>{if(G.tick>=r.returnAt)resolveRaid(r);});
   seasonTick();
   checkVictoryPath();
   updateBadges();
@@ -969,6 +1361,7 @@ function switchTab(tab){
   if(tab==='build')renderBuildings();
   if(tab==='research')renderResearch();
   if(tab==='heroes')renderHeroes();
+  if(tab==='combat')renderCombat();
 }
 
 // ── BADGES ──
@@ -1112,7 +1505,7 @@ function showSnot(msg){
 
 // ── RENDER ──
 function renderAll(){
-  renderResources();renderBuildings();renderMap();renderResearch();renderHeroes();renderFaction();
+  renderResources();renderBuildings();renderMap();renderResearch();renderHeroes();renderFaction();renderCombat();
   if(G.logDirty){renderLog();G.logDirty=false;}
   renderPrestige();
   document.getElementById('era-display').textContent=`${G.era} · Year ${G.year}`;
