@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d0a06">
+<meta name="mobile-web-app-capable" content="yes">
+
+<!-- iOS PWA -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hearthstone">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Hearthstone Chronicles</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --gold:#c9a84c; --gold-light:#e8c97a; --gold-dark:#8a6a1f;
+  --parchment:#f2e8d0; --parchment-dark:#d9c9a0;
+  --stone-light:#6b5a42; --blood-light:#c0392b; --forest-light:#4a7a32;
+  --panel-bg:rgba(22,16,10,0.96); --panel-border:rgba(201,168,76,0.35);
+  --tab-h:56px; --header-h:54px; --era-h:36px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{background:#0d0a06;color:var(--parchment);font-family:'Crimson Text',serif;font-size:16px;}
+body::before{content:'';position:fixed;inset:0;
+  background:radial-gradient(ellipse at 20% 20%,rgba(42,74,122,.28) 0%,transparent 55%),
+             radial-gradient(ellipse at 80% 80%,rgba(45,74,30,.18) 0%,transparent 55%),#0d0a06;
+  z-index:-1;}
+
+/* HEADER */
+#header{height:var(--header-h);background:rgba(8,6,3,.98);border-bottom:1px solid var(--panel-border);
+  display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:sticky;top:0;z-index:200;flex-shrink:0;}
+#header h1{font-family:'Cinzel',serif;font-size:17px;font-weight:700;color:var(--gold);letter-spacing:3px;}
+#header .sub{font-size:10px;color:var(--gold-dark);letter-spacing:2px;}
+.faction-badge{display:flex;flex-direction:column;align-items:flex-end;background:rgba(201,168,76,.07);
+  border:1px solid var(--panel-border);border-radius:4px;padding:4px 10px;}
+.faction-badge .fname{font-family:'Cinzel',serif;font-size:12px;color:var(--gold);letter-spacing:1px;}
+.faction-badge .fera{font-size:11px;color:var(--parchment-dark);font-style:italic;}
+
+/* ERA BAR */
+#era-bar{height:var(--era-h);flex-shrink:0;background:rgba(8,6,3,.85);border-bottom:1px solid rgba(201,168,76,.12);
+  display:flex;align-items:center;gap:12px;padding:0 16px;}
+.era-label{font-family:'Cinzel',serif;font-size:10px;color:var(--gold-dark);letter-spacing:2px;white-space:nowrap;}
+.pbar-outer{flex:1;height:5px;background:rgba(201,168,76,.1);border-radius:3px;overflow:hidden;}
+.pbar-inner{height:100%;background:linear-gradient(90deg,var(--gold-dark),var(--gold));border-radius:3px;transition:width 1s ease;}
+.pval{font-family:'Cinzel',serif;font-size:10px;color:var(--gold);white-space:nowrap;}
+.tick-outer{width:90px;height:5px;background:rgba(201,168,76,.08);border-radius:3px;border:1px solid rgba(201,168,76,.18);overflow:hidden;flex-shrink:0;}
+.tick-inner{height:100%;background:linear-gradient(90deg,rgba(201,168,76,.4),var(--gold-light));border-radius:3px;width:0%;}
+.tick-label{font-family:'Cinzel',serif;font-size:9px;color:var(--gold-dark);letter-spacing:1px;white-space:nowrap;}
+@keyframes tickPulse{0%{opacity:1}50%{opacity:.25;background:#fff}100%{opacity:1}}
+
+/* SHELL */
+#shell{display:flex;height:calc(100vh - var(--header-h) - var(--era-h));overflow:hidden;}
+
+/* SIDEBAR */
+#sidebar{width:52px;flex-shrink:0;background:rgba(10,8,4,.98);border-right:1px solid var(--panel-border);
+  display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:4px;}
+.stab{width:40px;height:40px;border-radius:6px;border:1px solid transparent;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;font-size:18px;position:relative;}
+.stab:hover{background:rgba(201,168,76,.08);border-color:rgba(201,168,76,.2);}
+.stab.active{background:rgba(201,168,76,.15);border-color:var(--gold-dark);}
+.stab .slabel{font-family:'Cinzel',serif;font-size:6px;color:var(--gold-dark);letter-spacing:.5px;margin-top:1px;}
+.stab.active .slabel{color:var(--gold);}
+.stab .bdot{position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;
+  background:var(--blood-light);border:1px solid #0d0a06;display:none;}
+.stab .bdot.on{display:block;}
+
+/* CONTENT */
+#content{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px;}
+.tab-view{display:none;}
+.tab-view.active{display:block;}
+
+/* MOBILE BOTTOM BAR */
+#bottombar{display:none;position:fixed;bottom:0;left:0;right:0;height:calc(var(--tab-h) + env(safe-area-inset-bottom));
+  background:rgba(8,6,3,.98);border-top:1px solid var(--panel-border);z-index:200;}
+#bottombar .btabs{display:flex;height:var(--tab-h);}
+.btab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;font-size:21px;gap:2px;position:relative;}
+.btab .blabel{font-family:'Cinzel',serif;font-size:8px;color:var(--gold-dark);letter-spacing:.5px;}
+.btab.active .blabel{color:var(--gold);}
+.btab.active{background:rgba(201,168,76,.08);}
+.btab .bdot{position:absolute;top:5px;right:calc(50% - 16px);width:8px;height:8px;border-radius:50%;
+  background:var(--blood-light);border:1px solid #0d0a06;display:none;}
+.btab .bdot.on{display:block;}
+
+@media(max-width:640px){
+  #sidebar{display:none;}
+  #bottombar{display:block;}
+  #content{padding:10px;padding-bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 10px);}
+  #header h1{font-size:14px;}
+  .tick-outer,.tick-label{display:none;}
+}
+
+/* SECTION CARD */
+.section{background:rgba(10,8,4,.65);border:1px solid var(--panel-border);border-radius:6px;padding:14px;margin-bottom:12px;}
+.section-title{font-family:'Cinzel',serif;font-size:11px;letter-spacing:2.5px;color:var(--gold-dark);text-transform:uppercase;
+  margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(201,168,76,.12);}
+
+/* RESOURCES */
+.resource-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
+@media(max-width:400px){.resource-grid{grid-template-columns:repeat(2,1fr);}}
+.rc{background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.13);border-radius:4px;padding:9px 8px;transition:border-color .2s;}
+.rc:hover{border-color:rgba(201,168,76,.3);}
+.rc-icon{font-size:17px;margin-bottom:2px;}
+.rc-name{font-family:'Cinzel',serif;font-size:8px;letter-spacing:1.5px;color:var(--gold-dark);text-transform:uppercase;}
+.rc-amount{font-family:'Cinzel',serif;font-size:15px;color:var(--gold-light);font-weight:600;}
+.rc-rate{font-size:11px;color:var(--forest-light);font-style:italic;}
+.rc-rate.neg{color:var(--blood-light);}
+.boost-row{grid-column:1/-1;font-family:'Cinzel',serif;font-size:10px;color:var(--forest-light);letter-spacing:.5px;
+  padding:4px 6px;background:rgba(74,122,50,.08);border:1px solid rgba(74,122,50,.2);border-radius:3px;}
+
+/* BUILDINGS */
+.blist{display:flex;flex-direction:column;gap:8px;}
+.bcard{background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.1);border-radius:4px;padding:11px;
+  transition:all .2s;position:relative;overflow:hidden;}
+.bcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--gold);opacity:0;transition:opacity .2s;}
+.bcard:hover{background:rgba(201,168,76,.06);border-color:rgba(201,168,76,.25);}
+.bcard:hover::before{opacity:1;}
+.bcard.can{border-color:rgba(201,168,76,.22);}
+.bcard.maxed{opacity:.45;pointer-events:none;}
+.bheader{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
+.bname{font-family:'Cinzel',serif;font-size:12px;color:var(--parchment);}
+.blvl{font-family:'Cinzel',serif;font-size:9px;color:var(--gold);background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.18);border-radius:2px;padding:1px 5px;}
+.bdesc{font-size:12px;color:var(--stone-light);font-style:italic;margin-bottom:5px;line-height:1.4;}
+.beff{font-size:12px;color:var(--forest-light);margin-bottom:5px;}
+.bcosts{display:flex;gap:7px;flex-wrap:wrap;}
+.bcost{font-size:11px;color:var(--parchment-dark);}
+.bcost.no{color:var(--blood-light);}
+.bbtn{width:100%;margin-top:7px;padding:5px;background:rgba(201,168,76,.1);border:1px solid var(--gold-dark);border-radius:3px;
+  color:var(--gold);font-family:'Cinzel',serif;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;transition:all .2s;}
+.bbtn:hover:not(:disabled){background:rgba(201,168,76,.2);border-color:var(--gold);color:var(--gold-light);}
+.bbtn:disabled{opacity:.35;cursor:not-allowed;}
+.mystery{background:rgba(255,255,255,.02);border:1px dashed rgba(201,168,76,.15);border-radius:4px;
+  padding:11px;display:flex;align-items:center;gap:10px;}
+.mystery-icon{font-size:22px;filter:grayscale(1);opacity:.4;}
+.mystery-title{font-family:'Cinzel',serif;font-size:11px;color:var(--stone-light);font-style:italic;}
+.mystery-hint{font-size:11px;color:rgba(201,168,76,.35);margin-top:2px;}
+
+/* MAP */
+.map-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;}
+.map-tile{aspect-ratio:1;border-radius:4px;border:1px solid rgba(201,168,76,.08);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:18px;cursor:pointer;transition:all .2s;background:rgba(255,255,255,.02);}
+.map-tile:hover{border-color:rgba(201,168,76,.3);background:rgba(201,168,76,.05);transform:scale(1.04);}
+.map-tile.built{background:rgba(201,168,76,.07);border-color:rgba(201,168,76,.22);}
+.map-tile.empty{opacity:.35;}
+.tile-lbl{font-family:'Cinzel',serif;font-size:6px;letter-spacing:.5px;color:var(--gold-dark);text-align:center;margin-top:1px;text-transform:uppercase;}
+
+/* LOG */
+.log-entries{max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;}
+.log-entry{font-size:13px;color:var(--stone-light);font-style:italic;padding:3px 0;border-bottom:1px solid rgba(201,168,76,.05);line-height:1.4;animation:fadeIn .35s ease;}
+.log-entry .lt{font-size:9px;color:var(--gold-dark);font-style:normal;font-family:'Cinzel',serif;margin-right:5px;}
+.log-entry.important{color:var(--gold-light);}
+.log-entry.danger{color:var(--blood-light);}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+
+/* RESEARCH */
+.rtabs{display:flex;gap:4px;margin-bottom:10px;}
+.rtab{flex:1;padding:5px 2px;background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.13);border-radius:3px;
+  color:var(--stone-light);font-family:'Cinzel',serif;font-size:9px;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;transition:all .2s;text-align:center;}
+.rtab.active{background:rgba(201,168,76,.1);border-color:var(--gold-dark);color:var(--gold);}
+.rtab.tab-locked{opacity:.4;cursor:not-allowed;}
+.rtab:hover:not(.active):not(.tab-locked){background:rgba(201,168,76,.05);}
+.rlist{display:flex;flex-direction:column;gap:6px;}
+.ritem{background:rgba(255,255,255,.02);border:1px solid rgba(201,168,76,.1);border-radius:4px;padding:9px;cursor:pointer;transition:all .2s;}
+.ritem:hover:not(.rlocked):not(.rcompleted):not(.rmystery){background:rgba(201,168,76,.06);border-color:rgba(201,168,76,.22);}
+.ritem.rcompleted{border-color:rgba(74,122,50,.35);background:rgba(74,122,50,.05);}
+.ritem.rlocked{opacity:.38;cursor:not-allowed;}
+.ritem.ractive{border-color:rgba(201,168,76,.35);}
+.ritem.rmystery{opacity:.4;cursor:not-allowed;border-style:dashed;}
+.rname{font-family:'Cinzel',serif;font-size:11px;color:var(--parchment);margin-bottom:2px;}
+.ritem.rcompleted .rname{color:var(--forest-light);}
+.rdesc{font-size:11px;color:var(--stone-light);font-style:italic;margin-bottom:4px;line-height:1.3;}
+.rprog{height:3px;background:rgba(201,168,76,.1);border-radius:2px;overflow:hidden;margin-top:3px;}
+.rprog-inner{height:100%;background:var(--gold);border-radius:2px;transition:width .8s ease;}
+
+/* HEROES */
+.hlist{display:flex;flex-direction:column;gap:9px;}
+.hcard{background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.1);border-radius:4px;padding:11px;transition:all .2s;}
+.hcard:hover{background:rgba(201,168,76,.05);}
+.hname{font-family:'Cinzel',serif;font-size:12px;color:var(--gold-light);}
+.hclass{font-size:10px;color:var(--stone-light);font-style:italic;margin-bottom:7px;}
+.hstats{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:7px;}
+.hstat{background:rgba(255,255,255,.03);border-radius:3px;padding:4px;text-align:center;}
+.hstat-v{font-family:'Cinzel',serif;font-size:13px;color:var(--parchment);}
+.hstat-l{font-size:8px;color:var(--stone-light);text-transform:uppercase;letter-spacing:.5px;}
+.hxp{height:3px;background:rgba(201,168,76,.1);border-radius:2px;overflow:hidden;margin-bottom:7px;}
+.hxp-i{height:100%;background:linear-gradient(90deg,var(--gold-dark),var(--gold));border-radius:2px;transition:width .5s;}
+.hstatus{font-size:11px;color:var(--stone-light);font-style:italic;margin-bottom:6px;}
+.hstatus.onq{color:var(--forest-light);}
+.hstatus.danger{color:var(--blood-light);}
+.qbtn{width:100%;padding:5px;background:rgba(139,26,26,.12);border:1px solid rgba(139,26,26,.35);border-radius:3px;
+  color:#d4826a;font-family:'Cinzel',serif;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;transition:all .2s;}
+.qbtn:hover:not(:disabled){background:rgba(139,26,26,.25);border-color:var(--blood-light);}
+.qbtn:disabled{opacity:.35;cursor:not-allowed;}
+.qbtn.ret{background:rgba(74,122,50,.12);border-color:rgba(74,122,50,.35);color:var(--forest-light);}
+
+/* FACTION */
+.ftrait{background:rgba(201,168,76,.04);border:1px solid rgba(201,168,76,.1);border-radius:4px;padding:8px 10px;margin-bottom:6px;}
+.ftrait-name{font-family:'Cinzel',serif;font-size:10px;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;}
+.ftrait-desc{font-size:12px;color:var(--stone-light);font-style:italic;line-height:1.4;}
+.crow{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px;}
+.cf{font-family:'Cinzel',serif;font-size:11px;min-width:80px;}
+.beats{color:var(--forest-light);}
+.loses{color:var(--blood-light);}
+
+/* OVERLAY NOTIFICATIONS */
+#overlay-stack{position:fixed;top:calc(var(--header-h) + var(--era-h) + 10px);right:14px;z-index:500;
+  display:flex;flex-direction:column;gap:6px;align-items:flex-end;pointer-events:none;}
+.onotif{background:rgba(10,8,4,.97);border:1px solid var(--gold);border-left:3px solid var(--gold);
+  border-radius:4px;padding:9px 14px;font-family:'Cinzel',serif;font-size:12px;color:var(--gold-light);
+  letter-spacing:.5px;max-width:260px;animation:nIn .3s ease forwards;pointer-events:auto;}
+.onotif.danger{border-color:var(--blood-light);border-left-color:var(--blood-light);color:#e8806a;}
+.onotif.success{border-color:var(--forest-light);border-left-color:var(--forest-light);color:#8dcc6a;}
+.onotif .ntitle{font-size:10px;margin-bottom:3px;opacity:.7;letter-spacing:1px;}
+@keyframes nIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+@keyframes nOut{from{opacity:1;transform:none}to{opacity:0;transform:translateX(14px)}}
+
+/* SNOT (small bottom notif) */
+.snot{position:fixed;top:calc(var(--header-h) + var(--era-h) + 10px);left:50%;transform:translateX(-50%);
+  background:rgba(10,8,4,.95);border:1px solid var(--gold);border-radius:4px;
+  padding:8px 18px;font-family:'Cinzel',serif;font-size:12px;color:var(--gold-light);
+  letter-spacing:.5px;z-index:400;animation:snotA 2.4s ease forwards;text-align:center;}
+@keyframes snotA{
+  0%{opacity:0;transform:translateX(-50%) translateY(-8px)}
+  12%{opacity:1;transform:translateX(-50%) translateY(0)}
+  75%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-5px)}}
+
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(201,168,76,.18);border-radius:2px;}
+</style>
+<script>
+  if("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(()=>{});
+    });
+  }
+</script>
+</head>
+<body>
+
+<div id="header">
+  <div>
+    <h1>Hearthstone Chronicles</h1>
+    <div class="sub">Age of the First Kings</div>
+  </div>
+  <div class="faction-badge">
+    <div class="fname">⚔ Men of the West</div>
+    <div class="fera" id="era-display">First Age · Year 1</div>
+  </div>
+</div>
+
+<div id="era-bar">
+  <span class="era-label">Prestige</span>
+  <div class="pbar-outer"><div class="pbar-inner" id="prestige-bar" style="width:0%"></div></div>
+  <span class="pval" id="prestige-val">0/1000</span>
+  <span class="tick-label">Harvest</span>
+  <div class="tick-outer"><div class="tick-inner" id="tick-bar"></div></div>
+</div>
+
+<div id="shell">
+  <div id="sidebar">
+    <div class="stab active" data-tab="kingdom" onclick="switchTab('kingdom')">🏰<span class="slabel">Kingdom</span></div>
+    <div class="stab" data-tab="build" onclick="switchTab('build')">🏗<span class="slabel">Build</span><span class="bdot" id="bdot-build"></span></div>
+    <div class="stab" data-tab="research" onclick="switchTab('research')">📚<span class="slabel">Research</span><span class="bdot" id="bdot-research"></span></div>
+    <div class="stab" data-tab="heroes" onclick="switchTab('heroes')">⚔<span class="slabel">Heroes</span><span class="bdot" id="bdot-heroes"></span></div>
+    <div class="stab" data-tab="faction" onclick="switchTab('faction')">⚜<span class="slabel">Faction</span></div>
+  </div>
+
+  <div id="content">
+
+    <!-- KINGDOM TAB -->
+    <div class="tab-view active" id="tab-kingdom">
+      <div class="section">
+        <div class="section-title">Kingdom Resources</div>
+        <div class="resource-grid" id="resource-grid"></div>
+      </div>
+      <div class="section">
+        <div class="section-title">⚔ Kingdom of Arnethia</div>
+        <div class="map-grid" id="map-grid"></div>
+      </div>
+      <div class="section">
+        <div class="section-title">📜 Chronicle</div>
+        <div class="log-entries" id="log-entries"></div>
+      </div>
+    </div>
+
+    <!-- BUILD TAB -->
+    <div class="tab-view" id="tab-build">
+      <div class="section">
+        <div class="section-title">Construct &amp; Upgrade</div>
+        <div class="blist" id="building-list"></div>
+      </div>
+    </div>
+
+    <!-- RESEARCH TAB -->
+    <div class="tab-view" id="tab-research">
+      <div class="section">
+        <div class="section-title">Research</div>
+        <div class="rtabs">
+          <div class="rtab active" data-tab="economy" onclick="switchResearchTab('economy')">Economy</div>
+          <div class="rtab" data-tab="military" onclick="switchResearchTab('military')">Military</div>
+          <div class="rtab tab-locked" data-tab="arcane" onclick="switchResearchTab('arcane')" id="rtab-arcane">Arcane</div>
+          <div class="rtab tab-locked" data-tab="diplomacy" onclick="switchResearchTab('diplomacy')" id="rtab-diplomacy">Diplomacy</div>
+        </div>
+        <div class="rlist" id="research-list"></div>
+      </div>
+    </div>
+
+    <!-- HEROES TAB -->
+    <div class="tab-view" id="tab-heroes">
+      <div class="section">
+        <div class="section-title">Heroes of Arnethia</div>
+        <div class="hlist" id="hero-list"></div>
+      </div>
+    </div>
+
+    <!-- FACTION TAB -->
+    <div class="tab-view" id="tab-faction">
+      <div class="section">
+        <div class="section-title">⚔ Men of the West</div>
+        <div class="ftrait"><div class="ftrait-name">Diplomatic Mastery</div><div class="ftrait-desc">Can form vassal treaties with neutral kingdoms. Tribute income scales with prestige.</div></div>
+        <div class="ftrait"><div class="ftrait-name">Balanced Arts</div><div class="ftrait-desc">No research branch costs more than others. Master of all paths when combined.</div></div>
+      </div>
+      <div class="section">
+        <div class="section-title">Trinity Counter System</div>
+        <div class="crow"><span class="cf" style="color:#c9a84c">⚔ Men</span><span class="beats">▶ beats</span><span class="cf" style="color:#8b1a1a">🐺 Wildlands</span></div>
+        <div class="crow"><span class="cf" style="color:#c9a84c">⚔ Men</span><span class="loses">◀ weak to</span><span class="cf" style="color:#4a7a32">🌿 Elves</span></div>
+        <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-top:6px;opacity:.6">Elves beat Men · Dwarves beat Elves · Wildlands beat Dwarves<br>Full faction rivalry unlocks in multiplayer.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="bottombar">
+  <div class="btabs">
+    <div class="btab active" data-tab="kingdom" onclick="switchTab('kingdom')">🏰<span class="blabel">Kingdom</span></div>
+    <div class="btab" data-tab="build" onclick="switchTab('build')">🏗<span class="blabel">Build</span><span class="bdot" id="mbdot-build"></span></div>
+    <div class="btab" data-tab="research" onclick="switchTab('research')">📚<span class="blabel">Research</span><span class="bdot" id="mbdot-research"></span></div>
+    <div class="btab" data-tab="heroes" onclick="switchTab('heroes')">⚔<span class="blabel">Heroes</span><span class="bdot" id="mbdot-heroes"></span></div>
+    <div class="btab" data-tab="faction" onclick="switchTab('faction')">⚜<span class="blabel">Faction</span></div>
+  </div>
+</div>
+
+<div id="overlay-stack"></div>
+
+<script>
+const G={
+  year:1,era:'First Age',tick:0,
+  prestige:0,prestigeGoal:1000,prestigeRate:0,
+  resources:{
+    gold: {amount:50,rate:2,max:500,icon:'🪙',name:'Gold'},
+    food: {amount:80,rate:3,max:500,icon:'🌾',name:'Food'},
+    wood: {amount:60,rate:3,max:500,icon:'🪵',name:'Wood'},
+    stone:{amount:30,rate:2,max:500,icon:'⚙', name:'Stone'},
+    iron: {amount:0, rate:0,max:300,icon:'⛏', name:'Iron'},
+    mana: {amount:0, rate:0,max:200,icon:'✨',name:'Mana'},
+  },
+  buildings:[],research:{},heroes:[],
+  activeResearch:null,researchProgress:0,
+  mapTiles:[],log:[],logDirty:true,
+  activeResearchTab:'economy',activeTab:'kingdom',
+  revealedBuildings:['farm','lumber','mine','market'],
+  revealedResearch:['trade_routes','crop_rotation','swordsmanship','fortification'],
+  unlockedResearchTabs:['economy','military'],
+  costReduction:null,wardProtect:false,hasAlchemy:false,
+  hasFarsight:false,hasSiege:false,questTimeMulti:null,fortBonus:0,
+};
+
+function earlyBoost(){
+  const t=G.buildings.reduce((s,b)=>s+b.level,0);
+  return Math.max(1,5-t*0.4);
+}
+
+const BD=[
+  {id:'farm',  name:'Grain Farm',   icon:'🌾',max:5,tier:1,desc:'Fertile fields feed your growing kingdom.',
+   eff:l=>`+${l*2} food/min`,cost:l=>({wood:20*l,stone:10*l}),
+   onBuild:l=>{G.resources.food.rate+=2;},unlocks:['lumber','mine']},
+  {id:'lumber',name:'Lumber Mill',  icon:'🪵',max:5,tier:1,desc:'Axes ring through the ancient forest.',
+   eff:l=>`+${l*2} wood/min`,cost:l=>({gold:15*l,stone:10*l}),
+   onBuild:l=>{G.resources.wood.rate+=2;},unlocks:['mine','market']},
+  {id:'mine',  name:'Stone Quarry', icon:'⛰', max:5,tier:1,desc:'Chisels bite deep into the hillside.',
+   eff:l=>`+${l*2} stone/min`,cost:l=>({wood:25*l,food:10*l}),
+   onBuild:l=>{G.resources.stone.rate+=2;},unlocks:['market','ironworks']},
+  {id:'market',name:'Grand Market', icon:'⚖', max:4,tier:2,desc:'Merchants bring coin from distant lands.',
+   eff:l=>`+${l*3} gold/min`,cost:l=>({wood:30*l,stone:20*l,food:15*l}),
+   onBuild:l=>{G.resources.gold.rate+=3;},unlocks:['ironworks']},
+  {id:'ironworks',name:'Iron Foundry',icon:'🔥',max:4,tier:2,desc:'Fire and hammer shape the future of war.',
+   eff:l=>`+${l} iron/min`,cost:l=>({stone:40*l,gold:30*l,wood:20*l}),
+   onBuild:l=>{G.resources.iron.rate+=1;},
+   req:{mine:2},unlocks:['tower','barracks']},
+  {id:'tower', name:'Mage Tower',   icon:'🗼',max:3,tier:3,desc:'Ancient ley lines channel arcane power.',
+   eff:l=>`+${l} mana/min, +${l*5}% research speed`,cost:l=>({stone:60*l,gold:50*l,iron:10*l}),
+   onBuild:l=>{G.resources.mana.rate+=1;revealR(['runic_script']);unlockTab('arcane');},
+   req:{ironworks:1},unlocks:['citadel']},
+  {id:'barracks',name:"King's Barracks",icon:'⚔',max:4,tier:3,desc:'Soldiers train under the banner of the West.',
+   eff:l=>`Unlocks hero slots. +${l*10}% hero combat`,cost:l=>({wood:40*l,stone:30*l,iron:5*l}),
+   onBuild:l=>{if(l===1)spawnHero();if(l===3)spawnHero();},
+   req:{ironworks:1},unlocks:['citadel']},
+  {id:'citadel',name:'Royal Citadel',icon:'🏰',max:3,tier:4,desc:'The seat of power. Expands caps and unlocks diplomacy.',
+   eff:l=>`+${l*200} all caps, +${l*20} prestige/min`,cost:l=>({gold:100*l,stone:80*l,iron:30*l,wood:60*l}),
+   onBuild:l=>{Object.values(G.resources).forEach(r=>r.max+=200);G.prestigeRate=(G.prestigeRate||0)+20;revealR(['envoys']);unlockTab('diplomacy');},
+   req:{barracks:2,tower:1}},
+];
+
+const RD={
+  economy:[
+    {id:'trade_routes',name:'Trade Routes',desc:'+25% gold income.',cost:{gold:80,wood:40},time:120,
+     eff:()=>{G.resources.gold.rate=Math.round(G.resources.gold.rate*1.25);},unlocks:['crop_rotation','stonemasons']},
+    {id:'crop_rotation',name:'Crop Rotation',desc:'+30% food income.',cost:{food:60,gold:40},time:150,
+     eff:()=>{G.resources.food.rate=Math.round(G.resources.food.rate*1.3);},req:'trade_routes',unlocks:['stonemasons']},
+    {id:'stonemasons',name:'Guild of Stonemasons',desc:'+50% stone income.',cost:{stone:80,gold:60},time:180,
+     eff:()=>{G.resources.stone.rate=Math.round(G.resources.stone.rate*1.5);},req:'trade_routes',unlocks:['banking']},
+    {id:'banking',name:'Royal Treasury',desc:'Gold cap doubled. +5 gold/min.',cost:{gold:200,iron:20},time:300,
+     eff:()=>{G.resources.gold.max*=2;G.resources.gold.rate+=5;},req:'stonemasons'},
+  ],
+  military:[
+    {id:'swordsmanship',name:'Swordsmanship',desc:'Heroes deal +20% damage.',cost:{iron:30,gold:50},time:120,
+     eff:()=>{G.heroes.forEach(h=>h.power=Math.round(h.power*1.2));},unlocks:['fortification','cavalry']},
+    {id:'fortification',name:'Fortifications',desc:'Border defence +40%.',cost:{stone:60,iron:20},time:150,
+     eff:()=>{G.fortBonus=(G.fortBonus||0)+40;},req:'swordsmanship',unlocks:['siegecraft']},
+    {id:'cavalry',name:'Order of Knights',desc:'Expedition time halved. Loot +25%.',cost:{iron:60,gold:80,food:40},time:240,
+     eff:()=>{G.questTimeMulti=0.5;},req:'swordsmanship'},
+    {id:'siegecraft',name:'Siege Engines',desc:'Unlocks conquest quests.',cost:{iron:100,stone:80,wood:60},time:360,
+     eff:()=>{G.hasSiege=true;},req:'fortification'},
+  ],
+  arcane:[
+    {id:'runic_script',name:'Runic Script',desc:'+1 mana/min from Mage Towers.',cost:{gold:60,wood:30},time:90,
+     eff:()=>{G.resources.mana.rate+=1;},unlocks:['warding','alchemy']},
+    {id:'warding',name:'Wards of Protection',desc:'Heroes survive fatal quests once.',cost:{mana:20,gold:60},time:180,
+     eff:()=>{G.wardProtect=true;},req:'runic_script',unlocks:['farseeing']},
+    {id:'alchemy',name:'Alchemical Arts',desc:'10 mana → 50 gold per minute.',cost:{mana:40,gold:80,iron:20},time:240,
+     eff:()=>{G.hasAlchemy=true;},req:'runic_script'},
+    {id:'farseeing',name:"The Palantír Art",desc:'Preview quest outcomes before committing.',cost:{mana:80,gold:100},time:300,
+     eff:()=>{G.hasFarsight=true;},req:'warding'},
+  ],
+  diplomacy:[
+    {id:'envoys',name:'Royal Envoys',desc:'+10 gold/min tribute from neutral lands.',cost:{gold:60,food:40},time:120,
+     eff:()=>{G.resources.gold.rate+=10;},unlocks:['treaties','trade_alliance']},
+    {id:'treaties',name:'Vassal Treaties',desc:'Men of the West unique. +20 prestige/min.',cost:{gold:120,food:60},time:200,
+     eff:()=>{G.prestigeRate=(G.prestigeRate||0)+20;},req:'envoys',unlocks:['high_council']},
+    {id:'trade_alliance',name:'Trade Alliance',desc:'Building costs reduced by 15%.',cost:{gold:150,iron:30},time:240,
+     eff:()=>{G.costReduction=0.85;},req:'envoys'},
+    {id:'high_council',name:'High Council of Kings',desc:'Establish dynastic dominance. +200 prestige.',cost:{gold:300,mana:50,iron:50},time:480,
+     eff:()=>{addLog('The High Council convenes. Your dynasty is legend.','important');G.prestige+=200;},req:'treaties'},
+  ],
+};
+
+const allR=()=>[...RD.economy,...RD.military,...RD.arcane,...RD.diplomacy];
+
+const HERO_NAMES=['Aldric the Bold','Seraphina Dawnblade','Torren Ironfist','Lyra Swiftarrow','Caelen of the Vale'];
+const HERO_CLS=['Knight','Ranger','Mage','Warrior','Scout'];
+const QUESTS=[
+  {name:'Border Skirmish',minP:5, t:120,rew:{gold:30,iron:10},xp:20,danger:.1},
+  {name:'Forest Hunt',    minP:8, t:180,rew:{food:50,wood:30},xp:35,danger:.15},
+  {name:'Dungeon Delve',  minP:10,t:240,rew:{iron:25,gold:40},xp:45,danger:.2},
+  {name:'Ancient Vault',  minP:20,t:360,rew:{gold:100,mana:20,iron:30},xp:80,danger:.3},
+  {name:'Dragon Scouting',minP:30,t:480,rew:{gold:150,mana:40},xp:120,danger:.4},
+];
+const MAP_DEF=[
+  {icon:'🏰',lbl:'Citadel',built:true},{icon:'⚔',lbl:'Barracks',id:'barracks'},
+  {icon:'🌾',lbl:'Farmlands',id:'farm'},{icon:'🪵',lbl:'Mill',id:'lumber'},
+  {icon:'⛰',lbl:'Quarry',id:'mine'},{icon:'⚖',lbl:'Market',id:'market'},
+  {icon:'🔥',lbl:'Foundry',id:'ironworks'},{icon:'🗼',lbl:'Tower',id:'tower'},
+  {icon:'🛤',lbl:'Roads'},{icon:'🌲',lbl:'Forest'},{icon:'🏔',lbl:'Highlands'},
+  {icon:'🌊',lbl:'River'},{icon:'⛺',lbl:'Outpost'},{icon:'🗺',lbl:'Ruins'},{icon:'🌅',lbl:'Borderlands'},
+];
+
+// ── PROGRESSIVE DISCLOSURE ──
+function revealB(id){
+  if(G.revealedBuildings.includes(id)) return;
+  G.revealedBuildings.push(id);
+  const b=BD.find(x=>x.id===id);
+  if(b) showOverlay(`${b.icon} ${b.name} is now available to construct.`,'success','New Building Unlocked');
+}
+function revealR(ids){
+  ids.forEach(id=>{
+    if(G.revealedResearch.includes(id)) return;
+    G.revealedResearch.push(id);
+    const r=allR().find(x=>x.id===id);
+    if(r) showOverlay(`${r.name} can now be researched.`,'success','New Research Available');
+  });
+}
+function unlockTab(tab){
+  if(G.unlockedResearchTabs.includes(tab)) return;
+  G.unlockedResearchTabs.push(tab);
+  showOverlay(`${tab.charAt(0).toUpperCase()+tab.slice(1)} research branch unlocked!`,'success','Branch Unlocked');
+}
+const bviz=id=>G.revealedBuildings.includes(id);
+const rviz=id=>G.revealedResearch.includes(id);
+
+// ── HELPERS ──
+function canAfford(costs){return Object.entries(costs).every(([r,a])=>G.resources[r]?.amount>=a);}
+function spend(costs){Object.entries(costs).forEach(([r,a])=>{G.resources[r].amount-=a;});}
+function blvl(id){return G.buildings.find(b=>b.id===id)?.level||0;}
+function chkReq(bDef){if(!bDef.req)return true;return Object.entries(bDef.req).every(([id,l])=>blvl(id)>=l);}
+
+// ── INIT ──
+function init(){
+  BD.forEach(b=>G.buildings.push({id:b.id,level:0}));
+  allR().forEach(r=>{ G.research[r.id]={completed:false}; });
+  G.mapTiles=MAP_DEF.map(t=>({...t}));
+  addLog('Your kingdom of Arnethia rises from humble beginnings.','important');
+  addLog('Build farms and mills. Discover what lies ahead.');
+  renderAll();
+  setInterval(gameTick,1000);
+  setInterval(renderAll,3000);
+  setInterval(saveGame,30000);
+  requestAnimationFrame(animateTickBar);
+  loadGame();
+}
+
+// ── TICK ──
+function gameTick(){
+  G.tick++;
+  const boost=earlyBoost();
+  Object.values(G.resources).forEach(r=>{if(r.rate>0)r.amount=Math.min(r.max,r.amount+(r.rate*boost)/60);});
+  if(G.hasAlchemy&&G.tick%60===0&&G.resources.mana.amount>=10){
+    G.resources.mana.amount-=10;G.resources.gold.amount=Math.min(G.resources.gold.max,G.resources.gold.amount+50);
+    addLog('Alchemy transmutes 10 mana → 50 gold. ✨');
+  }
+  if(G.prestigeRate>0&&G.tick%60===0)G.prestige=Math.min(G.prestigeGoal,G.prestige+G.prestigeRate);
+  if(G.tick%300===0){G.year++;addLog(`Year ${G.year} of the ${G.era}. The kingdom endures.`);}
+  if(G.activeResearch){
+    G.researchProgress++;
+    const rDef=allR().find(r=>r.id===G.activeResearch);
+    if(rDef&&G.researchProgress>=rDef.time)completeResearch(rDef);
+  }
+  G.heroes.forEach(h=>{if(h.qt>0){h.qt--;if(h.qt<=0)completeQuest(h);}});
+  updateBadges();
+}
+
+// ── TABS ──
+function switchTab(tab){
+  G.activeTab=tab;
+  document.querySelectorAll('.tab-view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.querySelectorAll('.stab,.btab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  clearBadge(tab);
+  if(tab==='build')renderBuildings();
+  if(tab==='research')renderResearch();
+  if(tab==='heroes')renderHeroes();
+}
+
+// ── BADGES ──
+function updateBadges(){
+  const anyBuild=BD.some(b=>{
+    if(!bviz(b.id))return false;
+    const l=blvl(b.id);if(l>=b.max)return false;
+    let c=b.cost(l+1);if(G.costReduction)c=Object.fromEntries(Object.entries(c).map(([k,v])=>[k,Math.floor(v*G.costReduction)]));
+    return canAfford(c)&&chkReq(b);
+  });
+  setBadge('build',anyBuild&&G.activeTab!=='build');
+  const anyRes=G.revealedResearch.some(id=>{
+    const r=allR().find(x=>x.id===id);
+    if(!r||G.research[id]?.completed||G.activeResearch)return false;
+    if(r.req&&!G.research[r.req]?.completed)return false;
+    return canAfford(r.cost);
+  });
+  setBadge('research',anyRes&&G.activeTab!=='research');
+  const heroRet=G.heroes.some(h=>h._ret);
+  setBadge('heroes',heroRet&&G.activeTab!=='heroes');
+}
+function setBadge(tab,show){
+  ['bdot-','mbdot-'].forEach(p=>{const el=document.getElementById(p+tab);if(el)el.classList.toggle('on',show);});
+}
+function clearBadge(tab){
+  setBadge(tab,false);
+  if(tab==='heroes')G.heroes.forEach(h=>h._ret=false);
+}
+
+// ── BUILD ──
+function buildBuilding(id){
+  const bDef=BD.find(b=>b.id===id);
+  const bState=G.buildings.find(b=>b.id===id);
+  if(!bDef||!bState)return;
+  if(bState.level>=bDef.max)return;
+  if(!chkReq(bDef)){showSnot('Requirements not met');return;}
+  const nl=bState.level+1;
+  let costs=bDef.cost(nl);
+  if(G.costReduction)costs=Object.fromEntries(Object.entries(costs).map(([k,v])=>[k,Math.floor(v*G.costReduction)]));
+  if(!canAfford(costs)){showSnot('Insufficient resources');return;}
+  spend(costs);bState.level=nl;bDef.onBuild(nl);G.prestige+=10*nl;
+  if(bDef.unlocks)bDef.unlocks.forEach(uid=>revealB(uid));
+  addLog(`${bDef.name} upgraded to level ${nl}. ${bDef.eff(nl)}.`,'important');
+  const mt=G.mapTiles.find(t=>t.id===id);if(mt)mt.built=true;
+  showOverlay(`${bDef.icon} ${bDef.name} — Level ${nl}\n${bDef.eff(nl)}`,'success','Constructed');
+  renderAll();
+}
+
+// ── RESEARCH ──
+function startResearch(id){
+  if(G.activeResearch){showSnot('Already researching');return;}
+  if(G.research[id]?.completed)return;
+  const rDef=allR().find(r=>r.id===id);
+  if(!rDef)return;
+  if(rDef.req&&!G.research[rDef.req]?.completed){showSnot('Requires prior research');return;}
+  if(!canAfford(rDef.cost)){showSnot('Insufficient resources');return;}
+  spend(rDef.cost);G.activeResearch=id;G.researchProgress=0;
+  addLog(`Scholars begin: ${rDef.name}...`);
+  renderResearch();
+}
+function completeResearch(rDef){
+  G.research[rDef.id].completed=true;G.activeResearch=null;G.researchProgress=0;
+  rDef.eff();G.prestige+=30;
+  if(rDef.unlocks)revealR(rDef.unlocks);
+  addLog(`Research complete: ${rDef.name}.`,'important');
+  showOverlay(`${rDef.name} complete!`,'success','Research Done');
+  setBadge('research',G.activeTab!=='research');
+  renderAll();
+}
+function switchResearchTab(tab){
+  if(!G.unlockedResearchTabs.includes(tab)){showSnot('This branch is not yet unlocked');return;}
+  G.activeResearchTab=tab;
+  document.querySelectorAll('.rtab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  renderResearch();
+}
+
+// ── HEROES ──
+function spawnHero(){
+  const used=G.heroes.map(h=>h.name);
+  const avail=HERO_NAMES.filter(n=>!used.includes(n));
+  if(!avail.length)return;
+  const name=avail[0],cls=HERO_CLS[G.heroes.length%HERO_CLS.length];
+  G.heroes.push({name,cls,level:1,xp:0,xpGoal:100,power:5+G.heroes.length*2,hp:100,maxHp:100,onQuest:false,qt:0,qname:'',qDef:null,_ret:false});
+  addLog(`${name} the ${cls} joins your banner!`,'important');
+  showOverlay(`${name} the ${cls} is ready.`,'success','Hero Arrived');
+  setBadge('heroes',G.activeTab!=='heroes');
+}
+function sendOnQuest(i){
+  const h=G.heroes[i];if(!h||h.onQuest)return;
+  const avail=QUESTS.filter(q=>h.power>=q.minP);
+  if(!avail.length){showSnot('Hero too weak for available quests');return;}
+  const q=avail[Math.floor(Math.random()*avail.length)];
+  let t=q.t;if(G.questTimeMulti)t=Math.round(t*G.questTimeMulti);
+  h.onQuest=true;h.qt=t;h.qname=q.name;h.qDef=q;h._ret=false;
+  addLog(`${h.name} departs for: ${q.name}. ~${Math.round(t/60)} min.`);
+  renderHeroes();
+}
+function completeQuest(h){
+  const q=h.qDef;
+  if(Math.random()<q.danger&&!G.wardProtect){
+    h.hp=Math.max(1,h.hp-30);
+    addLog(`⚠ ${h.name} returns wounded!`,'danger');
+    showOverlay(`${h.name} returns wounded from ${q.name}.`,'danger','Hero Injured');
+  } else if(Math.random()<q.danger&&G.wardProtect){
+    addLog(`🛡 Wards of Protection saved ${h.name}!`);
+  }
+  Object.entries(q.rew).forEach(([res,amt])=>{if(G.resources[res])G.resources[res].amount=Math.min(G.resources[res].max,G.resources[res].amount+amt);});
+  h.xp+=q.xp;
+  if(h.xp>=h.xpGoal){
+    h.level++;h.xp-=h.xpGoal;h.xpGoal=Math.round(h.xpGoal*1.5);h.power=Math.round(h.power*1.15);
+    addLog(`${h.name} reached level ${h.level}! Power: ${h.power}`,'important');
+    showOverlay(`${h.name} reached Level ${h.level}!\nPower now: ${h.power}`,'success','Level Up!');
+  }
+  h.onQuest=false;h.qt=0;h.qname='';h._ret=true;
+  G.prestige+=15;
+  addLog(`${h.name} returns from ${q.name}. Loot secured.`);
+  setBadge('heroes',G.activeTab!=='heroes');
+  renderAll();
+}
+
+// ── LOG ──
+function addLog(msg,type){
+  G.log.unshift({msg,type,time:`Yr.${G.year}`});
+  if(G.log.length>40)G.log.pop();
+  G.logDirty=true;
+}
+
+// ── OVERLAYS ──
+function showOverlay(msg,type='',title=''){
+  const s=document.getElementById('overlay-stack');
+  const el=document.createElement('div');
+  el.className='onotif'+(type?' '+type:'');
+  el.innerHTML=(title?`<div class="ntitle">${title}</div>`:'')+msg.split('\n').map(l=>`<div>${l}</div>`).join('');
+  s.appendChild(el);
+  setTimeout(()=>{el.style.animation='nOut .3s ease forwards';setTimeout(()=>el.remove(),320);},3500);
+}
+function showSnot(msg){
+  const el=document.createElement('div');el.className='snot';el.textContent=msg;
+  document.body.appendChild(el);setTimeout(()=>el.remove(),2500);
+}
+
+// ── RENDER ──
+function renderAll(){
+  renderResources();renderBuildings();renderMap();renderResearch();renderHeroes();
+  if(G.logDirty){renderLog();G.logDirty=false;}
+  renderPrestige();
+  document.getElementById('era-display').textContent=`${G.era} · Year ${G.year}`;
+  ['arcane','diplomacy'].forEach(tab=>{
+    const el=document.getElementById('rtab-'+tab);
+    if(el)el.classList.toggle('tab-locked',!G.unlockedResearchTabs.includes(tab));
+  });
+}
+
+function renderResources(){
+  const boost=earlyBoost();
+  const bHtml=boost>1?`<div class="boost-row">⚡ Early Kingdom Bonus: ${boost.toFixed(1)}x income active</div>`:'';
+  document.getElementById('resource-grid').innerHTML=bHtml+
+    Object.entries(G.resources).map(([k,r])=>`
+      <div class="rc">
+        <div class="rc-icon">${r.icon}</div>
+        <div class="rc-name">${r.name}</div>
+        <div class="rc-amount">${Math.floor(r.amount)}</div>
+        <div class="rc-rate ${r.rate<0?'neg':''}">${r.rate>0?'+':''}${(r.rate*boost).toFixed(1)}/min</div>
+      </div>`).join('');
+}
+
+function renderBuildings(){
+  const el=document.getElementById('building-list');if(!el)return;
+  let html='';
+  BD.forEach(bDef=>{
+    const vis=bviz(bDef.id);
+    if(!vis){
+      // show mystery if parent built
+      const parentBuilt=BD.some(b=>b.unlocks?.includes(bDef.id)&&blvl(b.id)>=1);
+      if(!parentBuilt)return;
+      html+=`<div class="mystery"><div class="mystery-icon">🔒</div>
+        <div><div class="mystery-title">??? Unknown Structure</div>
+        <div class="mystery-hint">Develop your kingdom further to reveal…</div></div></div>`;
+      return;
+    }
+    const bState=G.buildings.find(b=>b.id===bDef.id);
+    const lvl=bState?.level||0,nl=lvl+1,maxed=lvl>=bDef.max,req=chkReq(bDef);
+    let costs=bDef.cost(nl);
+    if(G.costReduction&&!maxed)costs=Object.fromEntries(Object.entries(costs).map(([k,v])=>[k,Math.floor(v*G.costReduction)]));
+    const aff=!maxed&&canAfford(costs)&&req;
+    const cHtml=maxed?'<span style="font-size:11px;color:var(--gold-dark)">Maximum level</span>':
+      Object.entries(costs).map(([r,a])=>`<span class="bcost ${G.resources[r]?.amount>=a?'':'no'}">${G.resources[r]?.icon||r} ${a}</span>`).join('');
+    html+=`<div class="bcard ${aff?'can':''} ${maxed?'maxed':''}">
+      <div class="bheader"><span class="bname">${bDef.icon} ${bDef.name}</span><span class="blvl">Lv ${lvl}/${bDef.max}</span></div>
+      <div class="bdesc">${bDef.desc}</div>
+      ${lvl>0?`<div class="beff">${bDef.eff(lvl)}</div>`:''}
+      ${!req?'<div style="font-size:11px;color:var(--blood-light);font-style:italic;margin-bottom:4px">⚠ Requires prerequisites</div>':''}
+      <div class="bcosts">${cHtml}</div>
+      ${!maxed?`<button class="bbtn" onclick="buildBuilding('${bDef.id}')" ${aff?'':'disabled'}>${lvl===0?'Construct':'Upgrade'} — Level ${nl}</button>`:''}
+    </div>`;
+  });
+  el.innerHTML=html;
+}
+
+function renderMap(){
+  const el=document.getElementById('map-grid');if(!el)return;
+  el.innerHTML=G.mapTiles.map(t=>{
+    const built=t.built||(t.id&&blvl(t.id)>0);
+    return `<div class="map-tile ${built?'built':'empty'}">${t.icon}<div class="tile-lbl">${t.lbl}</div></div>`;
+  }).join('');
+}
+
+function renderResearch(){
+  const el=document.getElementById('research-list');if(!el)return;
+  const tab=G.activeResearchTab;
+  if(!G.unlockedResearchTabs.includes(tab)){
+    el.innerHTML=`<div style="font-size:13px;color:var(--stone-light);font-style:italic;padding:8px">This branch is not yet unlocked. Build more to reveal it.</div>`;return;
+  }
+  const items=RD[tab]||[];
+  let prog=0;
+  if(G.activeResearch){const r=allR().find(x=>x.id===G.activeResearch);if(r)prog=Math.round((G.researchProgress/r.time)*100);}
+  el.innerHTML=items.map(rDef=>{
+    const done=G.research[rDef.id]?.completed;
+    const isAct=G.activeResearch===rDef.id;
+    const vis=rviz(rDef.id);
+    const reqMet=!rDef.req||G.research[rDef.req]?.completed;
+    const locked=!reqMet&&!done;
+    if(!vis&&!done)return`<div class="ritem rmystery"><div class="rname">??? Unknown Research</div><div class="rdesc">Advance your kingdom to reveal…</div></div>`;
+    const cHtml=Object.entries(rDef.cost).map(([r,a])=>{
+      const ok=G.resources[r]?.amount>=a;
+      return `<span style="font-size:11px;color:${ok?'var(--parchment-dark)':'var(--blood-light)'}">${G.resources[r]?.icon||r}${a}</span>`;
+    }).join(' ');
+    return`<div class="ritem ${done?'rcompleted':''} ${locked?'rlocked':''} ${isAct?'ractive':''}"
+         onclick="${!done&&!locked&&!G.activeResearch?`startResearch('${rDef.id}')`:''}" >
+      <div class="rname">${done?'✓ ':''}${rDef.name}</div>
+      <div class="rdesc">${rDef.desc}</div>
+      ${locked?`<div style="font-size:11px;color:var(--blood-light);font-style:italic">Requires: ${rDef.req}</div>`:''}
+      ${!done&&!locked?`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${cHtml}<span style="font-size:11px;color:var(--stone-light)">· ${Math.round(rDef.time/60)} min</span></div>`:''}
+      ${isAct?`<div class="rprog"><div class="rprog-inner" style="width:${prog}%"></div></div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function renderHeroes(){
+  const el=document.getElementById('hero-list');if(!el)return;
+  if(!G.heroes.length){el.innerHTML='<div style="padding:8px;font-size:13px;color:var(--stone-light);font-style:italic">Build the King\'s Barracks to recruit heroes.</div>';return;}
+  el.innerHTML=G.heroes.map((h,i)=>{
+    const xpP=Math.round((h.xp/h.xpGoal)*100);
+    const avail=QUESTS.filter(q=>h.power>=q.minP);
+    let status='Resting in the keep',sc='';
+    if(h.onQuest){const m=Math.ceil(h.qt/60);status=`On quest: ${h.qname} (~${m}m)`;sc='onq';}
+    return`<div class="hcard">
+      <div class="hname">⚔ ${h.name}</div>
+      <div class="hclass">${h.cls} · Level ${h.level}</div>
+      <div class="hstats">
+        <div class="hstat"><div class="hstat-v">${h.power}</div><div class="hstat-l">Power</div></div>
+        <div class="hstat"><div class="hstat-v">${h.hp}</div><div class="hstat-l">HP</div></div>
+        <div class="hstat"><div class="hstat-v">${h.level}</div><div class="hstat-l">Level</div></div>
+      </div>
+      <div style="font-size:10px;color:var(--stone-light);margin-bottom:3px">XP ${h.xp}/${h.xpGoal}</div>
+      <div class="hxp"><div class="hxp-i" style="width:${xpP}%"></div></div>
+      <div class="hstatus ${sc}">${status}</div>
+      <button class="qbtn ${h.onQuest?'ret':''}" onclick="${h.onQuest?'':(`sendOnQuest(${i})`)}" ${h.onQuest||!avail.length?'disabled':''}>
+        ${h.onQuest?'⏳ On Quest':(avail.length?`⚔ Send on Quest (${avail.length} available)`:'⚠ Too Weak')}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function renderLog(){
+  const el=document.getElementById('log-entries');if(!el)return;
+  el.innerHTML=G.log.slice(0,15).map(e=>`<div class="log-entry ${e.type||''}"><span class="lt">${e.time}</span>${e.msg}</div>`).join('');
+}
+
+function renderPrestige(){
+  const pct=Math.min(100,Math.round((G.prestige/G.prestigeGoal)*100));
+  document.getElementById('prestige-bar').style.width=pct+'%';
+  document.getElementById('prestige-val').textContent=`${Math.floor(G.prestige)}/${G.prestigeGoal}`;
+}
+
+// ── TICK TIMER ──
+let _rStart=null;
+function animateTickBar(ts){
+  if(!_rStart)_rStart=ts;
+  const pos=((ts-_rStart)/1000)%60;
+  const bar=document.getElementById('tick-bar');
+  if(bar){
+    bar.style.width=(pos/60*100).toFixed(2)+'%';
+    if(pos<0.3&&!bar._p){bar._p=true;bar.style.animation='tickPulse .3s ease';setTimeout(()=>{bar.style.animation='';bar._p=false;},350);}
+    else if(pos>=0.3)bar._p=false;
+  }
+  requestAnimationFrame(animateTickBar);
+}
+
+// ── SAVE / LOAD ──
+function saveGame(){
+  try{localStorage.setItem('hc3',JSON.stringify({
+    year:G.year,prestige:G.prestige,prestigeRate:G.prestigeRate,
+    resources:Object.fromEntries(Object.entries(G.resources).map(([k,v])=>[k,{amount:v.amount,rate:v.rate,max:v.max}])),
+    buildings:G.buildings,research:G.research,heroes:G.heroes,
+    activeResearch:G.activeResearch,researchProgress:G.researchProgress,tick:G.tick,
+    revealedBuildings:G.revealedBuildings,revealedResearch:G.revealedResearch,
+    unlockedResearchTabs:G.unlockedResearchTabs,
+    flags:{costReduction:G.costReduction,wardProtect:G.wardProtect,hasAlchemy:G.hasAlchemy,
+           hasFarsight:G.hasFarsight,hasSiege:G.hasSiege,questTimeMulti:G.questTimeMulti,fortBonus:G.fortBonus},
+    log:G.log.slice(0,20),
+  }));}catch(e){}
+}
+function loadGame(){
+  try{
+    const raw=localStorage.getItem('hc3');if(!raw)return;
+    const s=JSON.parse(raw);
+    G.year=s.year||1;G.prestige=s.prestige||0;G.prestigeRate=s.prestigeRate||0;
+    Object.entries(s.resources||{}).forEach(([k,v])=>{
+      if(G.resources[k]){G.resources[k].amount=v.amount;if(v.rate>G.resources[k].rate)G.resources[k].rate=v.rate;G.resources[k].max=v.max;}
+    });
+    (s.buildings||[]).forEach(b=>{const g=G.buildings.find(x=>x.id===b.id);if(g)g.level=b.level;});
+    Object.assign(G.research,s.research||{});
+    G.heroes=s.heroes||[];
+    G.activeResearch=s.activeResearch||null;G.researchProgress=s.researchProgress||0;G.tick=s.tick||0;
+    if(s.revealedBuildings)G.revealedBuildings=s.revealedBuildings;
+    if(s.revealedResearch)G.revealedResearch=s.revealedResearch;
+    if(s.unlockedResearchTabs)G.unlockedResearchTabs=s.unlockedResearchTabs;
+    if(s.flags){const f=s.flags;G.costReduction=f.costReduction;G.wardProtect=f.wardProtect;G.hasAlchemy=f.hasAlchemy;G.hasFarsight=f.hasFarsight;G.hasSiege=f.hasSiege;G.questTimeMulti=f.questTimeMulti;G.fortBonus=f.fortBonus;}
+    G.log=s.log||G.log;
+    addLog('Chronicle restored. Your dynasty continues…','important');
+  }catch(e){}
+}
+
+init();
+</script>
+</body>
+</html>
