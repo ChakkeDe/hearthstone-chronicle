@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Tap Test</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#111; color:#fff; font-family:sans-serif; }
+#log { padding:16px; font-size:14px; min-height:200px; }
+.entry { padding:4px 0; border-bottom:1px solid #333; }
+#tabs { position:fixed; bottom:0; left:0; right:0; display:flex; height:60px; background:#222; border-top:1px solid #444; }
+button.tab { flex:1; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer; -webkit-tap-highlight-color:rgba(255,255,255,.2); touch-action:manipulation; }
+button.tab.active { color:#c9a84c; background:rgba(201,168,76,.1); }
+</style>
+</head>
+<body>
+<div id="log"><div class="entry">Tap the buttons below...</div></div>
+<div id="tabs">
+  <button class="tab active" id="t1">🏰</button>
+  <button class="tab" id="t2">🏗</button>
+  <button class="tab" id="t3">📚</button>
+  <button class="tab" id="t4">⚔</button>
+  <button class="tab" id="t5">⚜</button>
+</div>
+<script>
+function log(msg){
+  const d=document.createElement('div');
+  d.className='entry';
+  d.textContent=new Date().toLocaleTimeString()+': '+msg;
+  document.getElementById('log').prepend(d);
+}
+
+// Method 1: onclick attribute style
+document.getElementById('t1').onclick=function(){log('t1 clicked - onclick');};
+
+// Method 2: addEventListener click
+document.getElementById('t2').addEventListener('click',function(){log('t2 clicked - addEventListener');});
+
+// Method 3: touchend
+document.getElementById('t3').addEventListener('touchend',function(e){e.preventDefault();log('t3 touchend');},{passive:false});
+
+// Method 4: touchstart
+document.getElementById('t4').addEventListener('touchstart',function(e){e.preventDefault();log('t4 touchstart');},{passive:false});
+
+// Method 5: both touchend and click
+document.getElementById('t5').addEventListener('touchend',function(e){e.preventDefault();log('t5 touchend');},{passive:false});
+document.getElementById('t5').addEventListener('click',function(){log('t5 click');});
+
+log('Page loaded. JS working.');
+</script>
+</body>
+</html>
