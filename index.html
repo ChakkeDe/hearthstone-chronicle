@@ -38,13 +38,17 @@ body::before{content:'';position:fixed;inset:0;
 
 /* HEADER */
 #header{height:var(--header-h);background:rgba(8,6,3,.98);border-bottom:1px solid var(--panel-border);
-  display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:sticky;top:0;z-index:200;flex-shrink:0;}
-#header h1{font-family:'Cinzel',serif;font-size:17px;font-weight:700;color:var(--gold);letter-spacing:3px;}
-#header .sub{font-size:10px;color:var(--gold-dark);letter-spacing:2px;}
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 12px 0 16px;position:sticky;top:0;z-index:200;flex-shrink:0;
+  padding-left:max(16px, env(safe-area-inset-left));
+  padding-right:max(12px, env(safe-area-inset-right));}
+#header h1{font-family:'Cinzel',serif;font-size:16px;font-weight:700;color:var(--gold);letter-spacing:2px;}
+#header .sub{font-size:9px;color:var(--gold-dark);letter-spacing:2px;}
 .faction-badge{display:flex;flex-direction:column;align-items:flex-end;background:rgba(201,168,76,.07);
-  border:1px solid var(--panel-border);border-radius:4px;padding:4px 10px;}
-.faction-badge .fname{font-family:'Cinzel',serif;font-size:12px;color:var(--gold);letter-spacing:1px;}
-.faction-badge .fera{font-size:11px;color:var(--parchment-dark);font-style:italic;}
+  border:1px solid var(--panel-border);border-radius:4px;padding:4px 8px;
+  max-width:160px;flex-shrink:0;}
+.faction-badge .fname{font-family:'Cinzel',serif;font-size:11px;color:var(--gold);letter-spacing:0.5px;white-space:nowrap;}
+.faction-badge .fera{font-size:10px;color:var(--parchment-dark);font-style:italic;white-space:nowrap;}
 
 /* ERA BAR */
 #era-bar{height:var(--era-h);flex-shrink:0;background:rgba(8,6,3,.85);border-bottom:1px solid rgba(201,168,76,.12);
@@ -86,24 +90,30 @@ body::before{content:'';position:fixed;inset:0;
 .tab-view.active{display:block;}
 
 /* MOBILE BOTTOM BAR */
-#bottombar{display:none;position:fixed;bottom:0;left:0;right:0;height:calc(var(--tab-h) + env(safe-area-inset-bottom));
-  background:rgba(8,6,3,.98);border-top:1px solid var(--panel-border);z-index:200;}
-#bottombar .btabs{display:flex;height:var(--tab-h);}
+#bottombar{display:none;position:fixed;bottom:0;left:0;right:0;
+  height:calc(var(--tab-h) + env(safe-area-inset-bottom));
+  background:rgba(8,6,3,.99);border-top:1px solid var(--panel-border);
+  z-index:9999;}
+#bottombar .btabs{display:flex;height:var(--tab-h);
+  padding-left:env(safe-area-inset-left);
+  padding-right:env(safe-area-inset-right);}
 .btab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  cursor:pointer;transition:all .2s;font-size:21px;gap:2px;position:relative;
+  cursor:pointer;transition:background .15s;font-size:21px;gap:2px;position:relative;
   background:none;border:none;color:inherit;font-family:inherit;
-  -webkit-tap-highlight-color:rgba(201,168,76,.15);touch-action:manipulation;}
+  min-height:44px;min-width:44px;
+  -webkit-tap-highlight-color:rgba(201,168,76,.25);
+  touch-action:manipulation;}
 .btab .blabel{font-family:'Cinzel',serif;font-size:8px;color:var(--gold-dark);letter-spacing:.5px;}
 .btab.active .blabel{color:var(--gold);}
-.btab.active{background:rgba(201,168,76,.08);}
+.btab.active{background:rgba(201,168,76,.1);}
 .btab .bdot{position:absolute;top:5px;right:calc(50% - 16px);width:8px;height:8px;border-radius:50%;
   background:var(--blood-light);border:1px solid #0d0a06;display:none;}
-.btab.on{display:block;}
+.btab .bdot.on{display:block;}
 
 @media(max-width:640px){
   #sidebar{display:none;}
   #bottombar{display:block;}
-  #content{padding:10px;padding-bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 10px);}
+  #content{padding:10px;padding-bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 20px);}
   #header h1{font-size:14px;}
   .tick-outer,.tick-label{display:none;}
 }
@@ -1113,9 +1123,10 @@ function renderAll(){
 }
 
 function renderResources(){
+  const el=document.getElementById('resource-grid');if(!el)return;
   const boost=earlyBoost();
   const bHtml=boost>1?`<div class="boost-row">⚡ Early Kingdom Bonus: ${boost.toFixed(1)}x income active</div>`:'';
-  document.getElementById('resource-grid').innerHTML=bHtml+
+  el.innerHTML=bHtml+
     Object.entries(G.resources).map(([k,r])=>`
       <div class="rc">
         <div class="rc-icon">${r.icon}</div>
@@ -1306,6 +1317,8 @@ function saveSupabaseConfig(){
   renderFaction();
   showOverlay('Cloud save connected!','success','Supabase Ready');
 }
+
+function renderLog(){
   const el=document.getElementById('log-entries');if(!el)return;
   el.innerHTML=G.log.slice(0,15).map(e=>`<div class="log-entry ${e.type||''}"><span class="lt">${e.time}</span>${e.msg}</div>`).join('');
 }
@@ -1353,14 +1366,15 @@ window.onerror=function(msg,src,line,col,err){
   return false;
 };
 
-try{
-  init();
-}catch(e){
-  const div=document.createElement('div');
-  div.style.cssText='position:fixed;top:0;left:0;right:0;background:#8b0000;color:#fff;padding:12px;font-size:13px;z-index:9999;font-family:monospace;white-space:pre-wrap;';
-  div.textContent='INIT ERROR:\n'+e.message+'\n'+e.stack;
-  document.body.appendChild(div);
-}
+// Wait for full DOM before starting
+window.addEventListener('DOMContentLoaded', function(){
+  try{ init(); }catch(e){
+    const div=document.createElement('div');
+    div.style.cssText='position:fixed;top:0;left:0;right:0;background:#8b0000;color:#fff;padding:12px;font-size:13px;z-index:9999;font-family:monospace;white-space:pre-wrap;';
+    div.textContent='INIT ERROR:\n'+e.message+'\n'+e.stack;
+    document.body.appendChild(div);
+  }
+});
 </script>
 </body>
 </html>
