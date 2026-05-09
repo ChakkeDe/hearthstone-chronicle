@@ -60,9 +60,11 @@ body::before{content:'';position:fixed;inset:0;
 /* SIDEBAR */
 #sidebar{width:52px;flex-shrink:0;background:rgba(10,8,4,.98);border-right:1px solid var(--panel-border);
   display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:4px;}
-.stab{width:40px;height:40px;border-radius:6px;border:1px solid transparent;
+.stab{width:40px;height:40px;border-radius:6px;border:none;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  cursor:pointer;transition:all .2s;font-size:18px;position:relative;}
+  cursor:pointer;transition:all .2s;font-size:18px;position:relative;
+  background:none;color:inherit;font-family:inherit;
+  -webkit-tap-highlight-color:rgba(201,168,76,.15);touch-action:manipulation;}
 .stab:hover{background:rgba(201,168,76,.08);border-color:rgba(201,168,76,.2);}
 .stab.active{background:rgba(201,168,76,.15);border-color:var(--gold-dark);}
 .stab .slabel{font-family:'Cinzel',serif;font-size:6px;color:var(--gold-dark);letter-spacing:.5px;margin-top:1px;}
@@ -81,13 +83,15 @@ body::before{content:'';position:fixed;inset:0;
   background:rgba(8,6,3,.98);border-top:1px solid var(--panel-border);z-index:200;}
 #bottombar .btabs{display:flex;height:var(--tab-h);}
 .btab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  cursor:pointer;transition:all .2s;font-size:21px;gap:2px;position:relative;}
+  cursor:pointer;transition:all .2s;font-size:21px;gap:2px;position:relative;
+  background:none;border:none;color:inherit;font-family:inherit;
+  -webkit-tap-highlight-color:rgba(201,168,76,.15);touch-action:manipulation;}
 .btab .blabel{font-family:'Cinzel',serif;font-size:8px;color:var(--gold-dark);letter-spacing:.5px;}
 .btab.active .blabel{color:var(--gold);}
 .btab.active{background:rgba(201,168,76,.08);}
 .btab .bdot{position:absolute;top:5px;right:calc(50% - 16px);width:8px;height:8px;border-radius:50%;
   background:var(--blood-light);border:1px solid #0d0a06;display:none;}
-.btab .bdot.on{display:block;}
+.btab.on{display:block;}
 
 @media(max-width:640px){
   #sidebar{display:none;}
@@ -267,11 +271,11 @@ body::before{content:'';position:fixed;inset:0;
 
 <div id="shell">
   <div id="sidebar">
-    <div class="stab active" data-tab="kingdom" onclick="switchTab('kingdom')">🏰<span class="slabel">Kingdom</span></div>
-    <div class="stab" data-tab="build" onclick="switchTab('build')">🏗<span class="slabel">Build</span><span class="bdot" id="bdot-build"></span></div>
-    <div class="stab" data-tab="research" onclick="switchTab('research')">📚<span class="slabel">Research</span><span class="bdot" id="bdot-research"></span></div>
-    <div class="stab" data-tab="heroes" onclick="switchTab('heroes')">⚔<span class="slabel">Heroes</span><span class="bdot" id="bdot-heroes"></span></div>
-    <div class="stab" data-tab="faction" onclick="switchTab('faction')">⚜<span class="slabel">Faction</span></div>
+    <button class="stab active" data-tab="kingdom" onclick="switchTab('kingdom')">🏰<span class="slabel">Kingdom</span></button>
+    <button class="stab" data-tab="build" onclick="switchTab('build')">🏗<span class="slabel">Build</span><span class="bdot" id="bdot-build"></span></button>
+    <button class="stab" data-tab="research" onclick="switchTab('research')">📚<span class="slabel">Research</span><span class="bdot" id="bdot-research"></span></button>
+    <button class="stab" data-tab="heroes" onclick="switchTab('heroes')">⚔<span class="slabel">Heroes</span><span class="bdot" id="bdot-heroes"></span></button>
+    <button class="stab" data-tab="faction" onclick="switchTab('faction')">⚜<span class="slabel">Faction</span></button>
   </div>
 
   <div id="content">
@@ -331,11 +335,11 @@ body::before{content:'';position:fixed;inset:0;
 
 <div id="bottombar">
   <div class="btabs">
-    <div class="btab active" data-tab="kingdom" onclick="switchTab('kingdom')">🏰<span class="blabel">Kingdom</span></div>
-    <div class="btab" data-tab="build" onclick="switchTab('build')">🏗<span class="blabel">Build</span><span class="bdot" id="mbdot-build"></span></div>
-    <div class="btab" data-tab="research" onclick="switchTab('research')">📚<span class="blabel">Research</span><span class="bdot" id="mbdot-research"></span></div>
-    <div class="btab" data-tab="heroes" onclick="switchTab('heroes')">⚔<span class="blabel">Heroes</span><span class="bdot" id="mbdot-heroes"></span></div>
-    <div class="btab" data-tab="faction" onclick="switchTab('faction')">⚜<span class="blabel">Faction</span></div>
+    <button class="btab active" data-tab="kingdom" onclick="switchTab('kingdom')">🏰<span class="blabel">Kingdom</span></button>
+    <button class="btab" data-tab="build" onclick="switchTab('build')">🏗<span class="blabel">Build</span><span class="bdot" id="mbdot-build"></span></button>
+    <button class="btab" data-tab="research" onclick="switchTab('research')">📚<span class="blabel">Research</span><span class="bdot" id="mbdot-research"></span></button>
+    <button class="btab" data-tab="heroes" onclick="switchTab('heroes')">⚔<span class="blabel">Heroes</span><span class="bdot" id="mbdot-heroes"></span></button>
+    <button class="btab" data-tab="faction" onclick="switchTab('faction')">⚜<span class="blabel">Faction</span></button>
   </div>
 </div>
 
