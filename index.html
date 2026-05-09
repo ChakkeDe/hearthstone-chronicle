@@ -26,7 +26,11 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;overflow:hidden;}
-body{background:#0d0a06;color:var(--parchment);font-family:'Crimson Text',serif;font-size:16px;}
+body{background:#0d0a06;color:var(--parchment);font-family:'Crimson Text',serif;font-size:16px;
+  display:flex;flex-direction:column;
+  height:100dvh;
+  height:-webkit-fill-available;}
+html{height:-webkit-fill-available;}
 body::before{content:'';position:fixed;inset:0;
   background:radial-gradient(ellipse at 20% 20%,rgba(42,74,122,.28) 0%,transparent 55%),
              radial-gradient(ellipse at 80% 80%,rgba(45,74,30,.18) 0%,transparent 55%),#0d0a06;
@@ -55,7 +59,10 @@ body::before{content:'';position:fixed;inset:0;
 @keyframes tickPulse{0%{opacity:1}50%{opacity:.25;background:#fff}100%{opacity:1}}
 
 /* SHELL */
-#shell{display:flex;height:calc(100vh - var(--header-h) - var(--era-h));overflow:hidden;}
+#shell{display:flex;
+  height:calc(100vh - var(--header-h) - var(--era-h));
+  height:calc(100dvh - var(--header-h) - var(--era-h));
+  overflow:hidden;}
 
 /* SIDEBAR */
 #sidebar{width:52px;flex-shrink:0;background:rgba(10,8,4,.98);border-right:1px solid var(--panel-border);
