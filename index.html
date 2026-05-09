@@ -1336,7 +1336,24 @@ function loadGame(){
   }catch(e){}
 }
 
-init();
+// ── GLOBAL ERROR HANDLER ──
+// Shows JS errors visibly on mobile where there's no console
+window.onerror=function(msg,src,line,col,err){
+  const div=document.createElement('div');
+  div.style.cssText='position:fixed;top:0;left:0;right:0;background:#8b0000;color:#fff;padding:12px;font-size:13px;z-index:9999;font-family:monospace;white-space:pre-wrap;';
+  div.textContent='JS ERROR:\n'+msg+'\nLine: '+line+'\n'+(err?.stack||'');
+  document.body.appendChild(div);
+  return false;
+};
+
+try{
+  init();
+}catch(e){
+  const div=document.createElement('div');
+  div.style.cssText='position:fixed;top:0;left:0;right:0;background:#8b0000;color:#fff;padding:12px;font-size:13px;z-index:9999;font-family:monospace;white-space:pre-wrap;';
+  div.textContent='INIT ERROR:\n'+e.message+'\n'+e.stack;
+  document.body.appendChild(div);
+}
 </script>
 </body>
 </html>
