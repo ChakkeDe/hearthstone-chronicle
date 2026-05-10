@@ -8,7 +8,8 @@ const G={
   dynasty:0,                 // number of prestige resets completed
   legacyRelics:[],           // relics carried across resets
   allianceSize:8,            // hard cap
-  lastSaveTime: Date.now(),  // for offline calculation
+  lastSaveTime: Date.now(),  // save timestamp
+  lastActiveTime: Date.now(), // last real game tick timestamp for AFK calculation
   offlineCapHours:12,
   resources:{
     gold: {amount:150, rate:2,  max:500, icon:'🪙',name:'Gold'},
@@ -78,8 +79,8 @@ function researchSpeedMultiplier(){
   return G.legacyRelics.includes('relic_research') ? (1/0.9) : 1;
 }
 
-const APP_VERSION = '0.7.7';
-const CACHE_VERSION = 'hc-v26';
+const APP_VERSION = '0.7.8';
+const CACHE_VERSION = 'hc-v27';
 
 // ── UPDATE CHECKER ──
 let _updateReloading=false;
@@ -236,7 +237,7 @@ function getReliableNow(){
   return Date.now()+_serverTimeOffset;
 }
 
-async function applyOfflineProgress(){
+async function applyOfflineProgress(sinceTime=null){
   if(_offlineApplying)return false;
   _offlineApplying=true;
   const reliableNow=getReliableNow();
@@ -254,7 +255,8 @@ async function applyOfflineProgress(){
     }
 
     // Calculate elapsed from last save
-    const rawElapsed=(reliableNow-(G.lastSaveTime||reliableNow))/1000;
+    const lastActive=sinceTime||G.lastActiveTime||G.lastSaveTime||reliableNow;
+    const rawElapsed=(reliableNow-lastActive)/1000;
 
   // --- Tick cross-check for non-cloud players ---
   // The game tick increments every real second while the game is open.
@@ -361,6 +363,7 @@ async function applyOfflineProgress(){
   // Update timestamps
     G.lastSaveTime=reliableNow;
     G.lastServerTime=reliableNow;
+    G.lastActiveTime=reliableNow;
     G._tickAtLastLoad=G.tick;
     return true;
   }finally{
@@ -370,6 +373,7 @@ async function applyOfflineProgress(){
 
 function handleAppBackground(){
   if(!_offlineReady)return;
+  G.lastActiveTime=G.lastActiveTime||getReliableNow();
   saveGame();
 }
 
@@ -571,6 +575,7 @@ function buildSavePayload(){
     seasonTick:G.seasonTick,dynasty:G.dynasty,legacyRelics:G.legacyRelics,
     victoryPath:G.victoryPath,victoryBonus:G.victoryBonus,
     lastSaveTime:getReliableNow(),
+    lastActiveTime:G.lastActiveTime||getReliableNow(),
     lastServerTime:G.lastServerTime||getReliableNow(),
     _lastKnownOfflineCap:G.offlineCapHours*3600,
     resources:Object.fromEntries(Object.entries(G.resources).map(([k,v])=>[k,{amount:v.amount,rate:v.rate,max:v.max}])),
@@ -599,6 +604,7 @@ function applyLoadedState(s){
   G.dynasty=s.dynasty||0;G.legacyRelics=s.legacyRelics||[];
   G.victoryPath=s.victoryPath||'mixed';G.victoryBonus=s.victoryBonus||0;
   G.lastSaveTime=s.lastSaveTime||Date.now();
+  G.lastActiveTime=s.lastActiveTime||s.lastSaveTime||Date.now();
   G.lastServerTime=s.lastServerTime||s.lastSaveTime||Date.now();
   G._lastKnownOfflineCap=s._lastKnownOfflineCap||G.offlineCapHours*3600;
   Object.entries(s.resources||{}).forEach(([k,v])=>{
@@ -1203,6 +1209,16 @@ function tabTouchHandler(e){
 
 // ── TICK ──
 function gameTick(){
+  const reliableNow=getReliableNow();
+  const lastActive=G.lastActiveTime||G.lastSaveTime||reliableNow;
+  const missedSeconds=Math.floor((reliableNow-lastActive)/1000)-1;
+  if(missedSeconds>=30&&!_offlineApplying){
+    applyOfflineProgress(lastActive).then(progressed=>{
+      if(progressed){renderAll();saveGame();}
+    });
+    return;
+  }
+  G.lastActiveTime=reliableNow;
   G.tick++;
   const rally=G._rallied&&G.tick<=G._rallyEnd;
   if(G._rallied&&G.tick>G._rallyEnd){G._rallied=false;addLog('The people\'s rally ends. Income returns to normal.');}
