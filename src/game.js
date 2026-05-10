@@ -74,6 +74,10 @@ function earlyBoost(){
   return Math.max(1, 5-(t*0.16));
 }
 
+function researchSpeedMultiplier(){
+  return G.legacyRelics.includes('relic_research') ? (1/0.9) : 1;
+}
+
 const APP_VERSION = '0.7.0';
 
 // ── UPDATE CHECKER ──
@@ -211,14 +215,14 @@ async function applyOfflineProgress(){
 
   // Research queue 1
   if(G.activeResearch){
-    G.researchProgress=Math.min(G.researchProgress+ticks,99999);
+    G.researchProgress=Math.min(G.researchProgress+(ticks*researchSpeedMultiplier()),99999);
     const rDef=allR().find(r=>r.id===G.activeResearch);
     if(rDef&&G.researchProgress>=rDef.time) completeResearch(rDef);
   }
 
   // Research queue 2
   if(G.activeResearch2){
-    G.researchProgress2=Math.min(G.researchProgress2+ticks,99999);
+    G.researchProgress2=Math.min(G.researchProgress2+(ticks*researchSpeedMultiplier()),99999);
     const rDef2=allR().find(r=>r.id===G.activeResearch2);
     if(rDef2&&G.researchProgress2>=rDef2.time){
       G.research[rDef2.id].completed=true;
@@ -1098,15 +1102,13 @@ function gameTick(){
   if(mineLvl>0&&G.tick%60===0) G.resources.iron.amount=Math.min(G.resources.iron.max, G.resources.iron.amount+(mineLvl*0.2));
   if(G.tick%300===0){G.year++;addLog(`Year ${G.year} of the ${G.era}. The kingdom endures.`);}
   if(G.activeResearch){
-    const resBonus=G.legacyRelics.includes('relic_research')?0.9:1;
-    G.researchProgress+=resBonus;
+    G.researchProgress+=researchSpeedMultiplier();
     const rDef=allR().find(r=>r.id===G.activeResearch);
     if(rDef&&G.researchProgress>=rDef.time)completeResearch(rDef);
   }
   // Second research queue
   if(G.activeResearch2){
-    const resBonus=G.legacyRelics.includes('relic_research')?0.9:1;
-    G.researchProgress2+=resBonus;
+    G.researchProgress2+=researchSpeedMultiplier();
     const rDef2=allR().find(r=>r.id===G.activeResearch2);
     if(rDef2&&G.researchProgress2>=rDef2.time){
       G.research[rDef2.id].completed=true;
