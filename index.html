@@ -69,7 +69,7 @@ body::before{content:'';position:fixed;inset:0;
 
 /* SHELL */
 #shell{display:flex;
-  height:calc(100dvh - var(--header-h) - var(--era-h) - max(env(safe-area-inset-top), 14px));
+  height:calc(100dvh - var(--header-h) - var(--era-h) - 34px - max(env(safe-area-inset-top), 14px));
   overflow:hidden;}
 
 /* SIDEBAR */
@@ -346,6 +346,87 @@ body::before{content:'';position:fixed;inset:0;
 .send-input{background:rgba(255,255,255,.04);border:1px solid rgba(201,168,76,.2);border-radius:3px;
   padding:5px 7px;color:var(--parchment);font-size:12px;width:100%;font-family:'Crimson Text',serif;}
 .send-label{font-family:'Cinzel',serif;font-size:9px;color:var(--gold-dark);letter-spacing:.5px;margin-bottom:3px;}
+/* POWER BADGE */
+#power-badge{font-family:'Cinzel',serif;font-size:11px;color:var(--gold);
+  background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);
+  border-radius:4px;padding:4px 8px;white-space:nowrap;cursor:pointer;}
+#power-badge:hover{background:rgba(201,168,76,.15);}
+
+/* FLOATING RESOURCE BAR */
+#resource-bar{background:rgba(8,6,3,.96);border-bottom:1px solid rgba(201,168,76,.2);
+  padding:5px 12px;overflow-x:auto;flex-shrink:0;
+  padding-left:max(12px, env(safe-area-inset-left));
+  padding-right:max(12px, env(safe-area-inset-right));}
+#resource-bar::-webkit-scrollbar{height:0;}
+#resource-bar-inner{display:flex;gap:10px;align-items:center;min-width:max-content;}
+.fres{display:flex;align-items:center;gap:4px;cursor:default;}
+.fres-icon{font-size:13px;}
+.fres-info{display:flex;flex-direction:column;}
+.fres-amt{font-family:'Cinzel',serif;font-size:11px;color:var(--parchment);line-height:1;}
+.fres-bar{width:36px;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;margin-top:2px;}
+.fres-fill{height:100%;border-radius:2px;transition:width .5s,background .5s;}
+.fres-fill.low{background:var(--forest-light);}
+.fres-fill.med{background:#e8a020;}
+.fres-fill.high{background:var(--blood-light);}
+.fres-sep{width:1px;height:20px;background:rgba(201,168,76,.15);flex-shrink:0;}
+
+/* RESOURCE CARDS with cap bar */
+.rc{background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.12);border-radius:4px;padding:8px;transition:border-color .2s;}
+.rc:hover{border-color:rgba(201,168,76,.3);}
+.rc-top{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+.rc-icon{font-size:16px;}
+.rc-name{font-family:'Cinzel',serif;font-size:9px;letter-spacing:1px;color:var(--gold-dark);text-transform:uppercase;}
+.rc-amount{font-family:'Cinzel',serif;font-size:18px;color:var(--gold-light);font-weight:600;line-height:1;}
+.rc-rate{font-size:11px;color:var(--forest-light);font-style:italic;}
+.rc-rate.neg{color:var(--blood-light);}
+.rc-capbar{height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;margin-top:4px;}
+.rc-capfill{height:100%;border-radius:2px;transition:width .5s,background .5s;}
+
+/* WAR CHEST */
+.warchest-card{background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.2);
+  border-radius:4px;padding:10px;margin-bottom:8px;}
+.wc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.wc-title{font-family:'Cinzel',serif;font-size:12px;color:var(--gold);}
+.wc-bar{height:5px;background:rgba(201,168,76,.1);border-radius:3px;overflow:hidden;margin-bottom:4px;}
+.wc-fill{height:100%;background:linear-gradient(90deg,var(--gold-dark),var(--gold));border-radius:3px;transition:width 1s;}
+.wc-convert-btn{width:100%;margin-top:6px;padding:5px;background:rgba(201,168,76,.1);
+  border:1px solid rgba(201,168,76,.3);border-radius:3px;color:var(--gold);
+  font-family:'Cinzel',serif;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;}
+.wc-convert-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* DUAL RESEARCH QUEUE */
+.research-queue{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+.rqueue-slot{background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.15);
+  border-radius:4px;padding:8px;min-height:44px;display:flex;align-items:center;justify-content:center;}
+.rqueue-slot.active{border-color:rgba(201,168,76,.35);}
+.rqueue-empty{font-size:11px;color:var(--stone-light);font-style:italic;}
+
+/* CITADEL DEFENCE */
+.defence-card{background:rgba(139,26,26,.06);border:1px solid rgba(139,26,26,.2);
+  border-radius:4px;padding:10px;margin-bottom:8px;}
+.def-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.def-title{font-family:'Cinzel',serif;font-size:11px;color:#d4826a;}
+.def-val{font-family:'Cinzel',serif;font-size:13px;color:var(--parchment);}
+.def-bar{height:4px;background:rgba(139,26,26,.1);border-radius:2px;overflow:hidden;}
+.def-fill{height:100%;background:linear-gradient(90deg,#8b1a1a,#c0392b);border-radius:2px;}
+
+/* AUTO-FARM TOGGLE */
+.autofarm-row{display:flex;align-items:center;justify-content:space-between;margin-top:6px;}
+.toggle-wrap{display:flex;align-items:center;gap:6px;}
+.toggle{width:36px;height:20px;border-radius:10px;background:rgba(255,255,255,.1);
+  border:1px solid rgba(201,168,76,.2);position:relative;cursor:pointer;
+  transition:background .2s;flex-shrink:0;touch-action:manipulation;}
+.toggle.on{background:rgba(74,122,50,.4);border-color:var(--forest-light);}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;
+  border-radius:50%;background:var(--stone-light);transition:transform .2s,background .2s;}
+.toggle.on::after{transform:translateX(16px);background:var(--forest-light);}
+.toggle-label{font-size:11px;color:var(--stone-light);}
+.threshold-row{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;color:var(--stone-light);}
+
+/* STORAGE BUILDINGS indicator */
+.storage-info{font-size:10px;color:var(--gold-dark);font-style:italic;margin-top:2px;}
+
+::-webkit-scrollbar{width:3px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:rgba(201,168,76,.18);border-radius:2px;}
 </style>
@@ -364,10 +445,18 @@ body::before{content:'';position:fixed;inset:0;
     <h1>Hearthstone Chronicles</h1>
     <div class="sub">Age of the First Kings</div>
   </div>
-  <div class="faction-badge">
-    <div class="fname">⚔ Men of the West</div>
-    <div class="fera" id="era-display">First Age · Year 1</div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <div id="power-badge">⚔ <span id="power-val">0</span></div>
+    <div class="faction-badge">
+      <div class="fname">⚔ Men of the West</div>
+      <div class="fera" id="era-display">First Age · Year 1</div>
+    </div>
   </div>
+</div>
+
+<!-- FLOATING RESOURCE BAR -->
+<div id="resource-bar">
+  <div id="resource-bar-inner"></div>
 </div>
 
 <div id="era-bar">
@@ -498,13 +587,30 @@ const G={
     cavalry: {total:0,available:0,injured:0,training:0,trainEnd:0},
     siege:   {total:0,available:0,injured:0,training:0,trainEnd:0},
   },
-  hospital:{capacity:50,recovering:0,recoverEnd:0},
-  npcFarms:[],
-  activeRaids:[],
-  combatLog:[],
-  // Supabase config — user fills these in
-  supabaseUrl:'',
-  supabaseKey:'',
+  hospital:{capacity:100,recovering:0,recoverEnd:0},
+  npcFarms:[],activeRaids:[],combatLog:[],
+  autoFarm:{},                    // {farmId: {enabled, troopFloor, lastCheck}}
+  // ── DEFENCE ──
+  wallDefence:0,
+  garrison:{infantry:0,archers:0,cavalry:0},
+  watchtowerUnlocked:false,
+  // ── WAR CHEST ──
+  warChest:0,
+  warChestCap:500,
+  warChestDecayRate:0.02,         // 2% per day
+  warChestWeeklyConverted:0,
+  warChestWeeklyLimit:1000,
+  lastWarChestDecay:0,
+  // ── DUAL RESEARCH ──
+  activeResearch2:null,
+  researchProgress2:0,
+  // ── STORAGE ──
+  storageLevels:{granary:0,vault:0,timberyard:0,armoury:0},
+  // ── UI FLAGS ──
+  cityDirty:true,
+  logDirty:true,
+  // Supabase config
+  supabaseUrl:'',supabaseKey:'',
 };
 
 function earlyBoost(){
@@ -885,13 +991,18 @@ function buildSavePayload(){
     _lastKnownOfflineCap:G.offlineCapHours*3600,
     resources:Object.fromEntries(Object.entries(G.resources).map(([k,v])=>[k,{amount:v.amount,rate:v.rate,max:v.max}])),
     buildings:G.buildings,research:G.research,heroes:G.heroes,
-    activeResearch:G.activeResearch,researchProgress:G.researchProgress,tick:G.tick,
+    activeResearch:G.activeResearch,researchProgress:G.researchProgress,
+    activeResearch2:G.activeResearch2,researchProgress2:G.researchProgress2,
+    tick:G.tick,
     revealedBuildings:G.revealedBuildings,revealedResearch:G.revealedResearch,
     unlockedResearchTabs:G.unlockedResearchTabs,
     flags:{costReduction:G.costReduction,wardProtect:G.wardProtect,hasAlchemy:G.hasAlchemy,
            hasFarsight:G.hasFarsight,hasSiege:G.hasSiege,questTimeMulti:G.questTimeMulti,fortBonus:G.fortBonus},
     troops:G.troops,hospital:G.hospital,npcFarms:G.npcFarms,
-    activeRaids:G.activeRaids,combatLog:G.combatLog,
+    activeRaids:G.activeRaids,combatLog:G.combatLog,autoFarm:G.autoFarm,
+    wallDefence:G.wallDefence,garrison:G.garrison,watchtowerUnlocked:G.watchtowerUnlocked,
+    warChest:G.warChest,warChestCap:G.warChestCap,warChestWeeklyConverted:G.warChestWeeklyConverted,
+    lastWarChestDecay:G.lastWarChestDecay,storageLevels:G.storageLevels,
     supabaseUrl:G.supabaseUrl,supabaseKey:G.supabaseKey,
     log:G.log.slice(0,20),
   };
@@ -922,6 +1033,16 @@ function applyLoadedState(s){
   if(s.npcFarms)G.npcFarms=s.npcFarms;
   if(s.activeRaids)G.activeRaids=s.activeRaids;
   if(s.combatLog)G.combatLog=s.combatLog;
+  if(s.autoFarm)G.autoFarm=s.autoFarm;
+  if(s.activeResearch2!=null){G.activeResearch2=s.activeResearch2;G.researchProgress2=s.researchProgress2||0;}
+  if(s.wallDefence!=null)G.wallDefence=s.wallDefence;
+  if(s.garrison)Object.assign(G.garrison,s.garrison);
+  if(s.watchtowerUnlocked)G.watchtowerUnlocked=s.watchtowerUnlocked;
+  if(s.warChest!=null)G.warChest=s.warChest;
+  if(s.warChestCap)G.warChestCap=s.warChestCap;
+  if(s.warChestWeeklyConverted!=null)G.warChestWeeklyConverted=s.warChestWeeklyConverted;
+  if(s.lastWarChestDecay)G.lastWarChestDecay=s.lastWarChestDecay;
+  if(s.storageLevels)Object.assign(G.storageLevels,s.storageLevels);
   if(s.supabaseUrl)G.supabaseUrl=s.supabaseUrl;
   if(s.supabaseKey)G.supabaseKey=s.supabaseKey;
   G.log=s.log||G.log;
@@ -971,17 +1092,34 @@ const BD=[
    onBuild:l=>{if(l===1)spawnHero();if(l===3)spawnHero();if(l===6)spawnHero();},
    req:{ironworks:1},unlocks:['citadel']},
 
-  {id:'citadel',name:'Royal Citadel',icon:'🏰',max:5,tier:4,desc:'The seat of power. Expands caps and unlocks diplomacy.',
-   eff:l=>`+${l*300} all caps, +${l*25} prestige/min`,
-   cost:l=>({gold:bCost(80,l), stone:bCost(60,l), iron:bCost(25,l), wood:bCost(40,l)}),
-   onBuild:l=>{Object.values(G.resources).forEach(r=>r.max+=300);G.prestigeRate=(G.prestigeRate||0)+25;revealR(['envoys']);unlockTab('diplomacy');},
+  {id:'citadel',name:'Royal Citadel',icon:'🏰',max:5,tier:4,desc:'The seat of power. Expands caps, unlocks diplomacy and defence.',
+   eff:l=>`+${l*300} caps, +${l*25} prestige/min, +${l*50} wall defence`,
+   cost:l=>({gold:bCost(80,l),stone:bCost(60,l),iron:bCost(25,l),wood:bCost(40,l)}),
+   onBuild:l=>{
+     Object.values(G.resources).forEach(r=>r.max+=300);
+     G.prestigeRate=(G.prestigeRate||0)+25;
+     G.wallDefence=(G.wallDefence||0)+50;
+     G.warChestCap=(G.warChestCap||500)+200;
+     if(l>=2){G.watchtowerUnlocked=true;addLog('Watchtower unlocked!','important');}
+     if(l>=3){addLog('Second research queue unlocked!','important');}
+     revealR(['envoys']);unlockTab('diplomacy');},
    req:{barracks:2,tower:1}},
-
-  {id:'hospital',name:'Field Hospital',icon:'🏥',max:6,tier:3,desc:'Treats wounded soldiers. Increases recovery capacity.',
+  {id:'hospital',name:'Field Hospital',icon:'🏥',max:6,tier:3,desc:'Treats wounded soldiers.',
    eff:l=>`Recover up to ${100+l*100} troops`,
-   cost:l=>({wood:bCost(20,l), stone:bCost(15,l), food:bCost(10,l)}),
-   onBuild:l=>{G.hospital.capacity=100+l*100;},
-   req:{barracks:1}},
+   cost:l=>({wood:bCost(20,l),stone:bCost(15,l),food:bCost(10,l)}),
+   onBuild:l=>{G.hospital.capacity=100+l*100;},req:{barracks:1}},
+  {id:'granary',name:'Granary',icon:'🌾',max:6,tier:2,desc:'Vast grain stores feed your armies.',
+   eff:l=>`+${l*200} food cap`,cost:l=>({wood:bCost(12,l),stone:bCost(8,l)}),
+   onBuild:l=>{G.resources.food.max+=200;G.storageLevels.granary=l;},req:{farm:2}},
+  {id:'vault',name:'Royal Vault',icon:'🏦',max:6,tier:2,desc:'Secure vaults protect your treasury.',
+   eff:l=>`+${l*200} gold cap`,cost:l=>({stone:bCost(15,l),iron:bCost(8,l)}),
+   onBuild:l=>{G.resources.gold.max+=200;G.storageLevels.vault=l;},req:{market:2}},
+  {id:'timberyard',name:'Timber Yard',icon:'🪵',max:6,tier:2,desc:'Seasoned wood stockpiles.',
+   eff:l=>`+${l*200} wood cap`,cost:l=>({food:bCost(10,l),stone:bCost(6,l)}),
+   onBuild:l=>{G.resources.wood.max+=200;G.storageLevels.timberyard=l;},req:{lumber:2}},
+  {id:'armoury',name:'Armoury',icon:'🗡',max:6,tier:2,desc:'Iron stockpiles for weapons and armour.',
+   eff:l=>`+${l*150} iron cap`,cost:l=>({stone:bCost(18,l),wood:bCost(10,l)}),
+   onBuild:l=>{G.resources.iron.max+=150;G.storageLevels.armoury=l;},req:{ironworks:2}},
 ];
 
 const RD={
@@ -1301,8 +1439,23 @@ function renderCombat(){
               <input type="number" class="send-input" id="send-${farm.id}-${type}" min="0" max="${G.troops[type].available}" value="0" placeholder="0">
             </div>`).join('')}
         </div>
-        <button class="attack-btn" onclick="launchAttack('${farm.id}')">⚔ Attack</button>`
-      }
+        <button class="attack-btn" onclick="launchAttack('${farm.id}')">⚔ Attack</button>
+        ${G.combatLog.some(e=>e.msg.includes(farm.name)&&e.type==='victory')?`
+        <div class="autofarm-row">
+          <div class="toggle-wrap">
+            <div class="toggle ${G.autoFarm[farm.id]?.enabled?'on':''}" onclick="toggleAutoFarm('${farm.id}')"></div>
+            <span class="toggle-label">Auto-farm ${G.autoFarm[farm.id]?.enabled?'ON ⚡':'OFF'}</span>
+          </div>
+          <span style="font-size:10px;color:var(--stone-light)">Floor: ${G.autoFarm[farm.id]?.floor||20}%</span>
+        </div>
+        <div class="threshold-row">
+          <span>Min troops:</span>
+          <input type="range" min="10" max="50" step="5" value="${G.autoFarm[farm.id]?.floor||20}"
+            oninput="setAutoFarmFloor('${farm.id}',this.value)"
+            style="flex:1;accent-color:var(--gold);">
+          <span>${G.autoFarm[farm.id]?.floor||20}%</span>
+        </div>`:''}
+        `}
     </div>`;
   }).join('');
 
@@ -1333,6 +1486,11 @@ function trainFromInput(type){
   const el=document.getElementById('train-qty-'+type);
   const qty=parseInt(el?.value)||1;
   trainTroops(type,Math.max(1,qty));
+}
+
+function setAutoFarmFloor(farmId,val){
+  if(!G.autoFarm[farmId])G.autoFarm[farmId]={enabled:false,floor:20};
+  G.autoFarm[farmId].floor=parseInt(val);
 }
 
 function launchAttack(farmId){
@@ -1366,7 +1524,150 @@ const MAP_DEF=[
 // ── RESEARCH HELPERS ──
 const allR=()=>[...RD.economy,...RD.military,...RD.arcane,...RD.diplomacy];
 
-// ── PROGRESSIVE DISCLOSURE ──
+// ── POWER LEVEL ──
+function calcPower(){
+  const bPow=G.buildings.reduce((s,b)=>s+b.level*100,0);
+  const rPow=Object.values(G.research).filter(r=>r.completed).length*200;
+  const hPow=G.heroes.reduce((s,h)=>s+h.level*50,0);
+  const tPow=Object.values(G.troops).reduce((s,t)=>s+t.total,0);
+  const pPow=Math.floor(G.prestige);
+  return bPow+rPow+hPow+tPow+pPow;
+}
+
+function renderPower(){
+  const p=calcPower();
+  const el=document.getElementById('power-val');
+  if(el) el.textContent=p.toLocaleString();
+}
+
+// ── FLOATING RESOURCE BAR ──
+function renderResourceBar(){
+  const el=document.getElementById('resource-bar-inner');if(!el)return;
+  const boost=earlyBoost();
+  el.innerHTML=Object.entries(G.resources).map(([k,r],i)=>{
+    const pct=Math.min(100,Math.round((r.amount/r.max)*100));
+    const cls=pct>=90?'high':pct>=75?'med':'low';
+    const sep=i>0?'<div class="fres-sep"></div>':'';
+    return`${sep}<div class="fres">
+      <div class="fres-icon">${r.icon}</div>
+      <div class="fres-info">
+        <div class="fres-amt">${Math.floor(r.amount)}</div>
+        <div class="fres-bar"><div class="fres-fill ${cls}" style="width:${pct}%"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── WAR CHEST ──
+function renderWarChest(){
+  return`<div class="warchest-card">
+    <div class="wc-header">
+      <span class="wc-title">⚔ War Chest</span>
+      <span style="font-family:'Cinzel',serif;font-size:11px;color:var(--gold)">${Math.floor(G.warChest)} / ${G.warChestCap}</span>
+    </div>
+    <div class="wc-bar"><div class="wc-fill" style="width:${Math.min(100,Math.round((G.warChest/G.warChestCap)*100))}%"></div></div>
+    <div style="font-size:10px;color:var(--stone-light);font-style:italic;margin-top:4px;margin-bottom:6px">
+      Converted this week: ${Math.floor(G.warChestWeeklyConverted)} / ${G.warChestWeeklyLimit}
+      ${G.victoryPath==='diplomatic'?` · <span style="color:var(--forest-light)">10% conversion bonus active</span>`:''}
+    </div>
+    <button class="wc-convert-btn" onclick="convertToWarChest()"
+      ${G.warChestWeeklyConverted>=G.warChestWeeklyLimit||G.warChest>=G.warChestCap?'disabled':''}>
+      Convert 100 Gold → War Chest
+    </button>
+  </div>`;
+}
+
+function convertToWarChest(){
+  if(G.warChestWeeklyConverted>=G.warChestWeeklyLimit){showSnot('Weekly conversion limit reached');return;}
+  if(G.warChest>=G.warChestCap){showSnot('War chest is full');return;}
+  const cost=100;
+  if(G.resources.gold.amount<cost){showSnot('Not enough gold');return;}
+  // Men of the West diplomatic bonus: 10% less conversion cost
+  const bonus=G.victoryPath==='diplomatic'?0.9:1;
+  const converted=Math.round(cost*bonus);
+  G.resources.gold.amount-=cost;
+  G.warChest=Math.min(G.warChestCap,G.warChest+converted);
+  G.warChestWeeklyConverted+=converted;
+  addLog(`Converted ${cost} gold → ${converted} War Chest.`);
+  renderFaction();
+}
+
+function warChestDecayTick(){
+  if(G.warChest<=0)return;
+  const now=G.tick;
+  if(now-G.lastWarChestDecay>=86400){ // once per day in ticks (86400 seconds)
+    const decayAmt=G.warChest*G.warChestDecayRate;
+    const decayMod=G.victoryPath==='research'?0.5:1; // Elves: slower decay (placeholder)
+    G.warChest=Math.max(0,G.warChest-(decayAmt*decayMod));
+    G.lastWarChestDecay=now;
+    if(decayAmt>1) addLog(`War chest decayed by ${Math.floor(decayAmt)} — stay active in battles to prevent loss.`,'danger');
+  }
+}
+
+// ── AUTO-FARM ──
+function toggleAutoFarm(farmId){
+  if(!G.autoFarm[farmId]) G.autoFarm[farmId]={enabled:false,floor:20};
+  G.autoFarm[farmId].enabled=!G.autoFarm[farmId].enabled;
+  if(G.autoFarm[farmId].enabled) addLog(`Auto-farm enabled for ${G.npcFarms.find(f=>f.id===farmId)?.name}.`);
+  renderCombat();
+}
+
+function checkAutoFarm(){
+  if(!G.npcFarms) return;
+  G.npcFarms.forEach(farm=>{
+    const af=G.autoFarm[farm.id];
+    if(!af?.enabled||!farm.available)return;
+    if(G.activeRaids.find(r=>r.farmId===farm.id))return;
+
+    // Check troop floor
+    const totalAvail=Object.values(G.troops).reduce((s,t)=>s+t.available,0);
+    const totalAll=Object.values(G.troops).reduce((s,t)=>s+t.total,0);
+    const floorPct=(af.floor||20)/100;
+    if(totalAvail<totalAll*floorPct){
+      if(!af._warned){
+        showOverlay(`Auto-farm paused — troops below ${af.floor}% threshold`,'danger','Auto-Farm');
+        af._warned=true;
+      }
+      return;
+    }
+    af._warned=false;
+
+    // Efficiency check: compare loot value vs expected repair cost
+    const lootVal=Object.entries(farm.loot).reduce((s,[r,v])=>s+(r==='gold'?v:v*0.5),0);
+    const repairCost=totalAvail*0.1*5; // rough estimate
+    if(repairCost>lootVal*0.8){
+      showOverlay(`Auto-farm paused — repair costs outweigh loot at ${farm.name}`,'danger','Efficiency Warning');
+      af.enabled=false;
+      renderCombat();
+      return;
+    }
+
+    // Send available non-siege troops
+    const sent={infantry:0,archers:0,cavalry:0,siege:0};
+    let power=0;
+    ['cavalry','archers','infantry'].forEach(type=>{
+      if(power>=farm.def)return;
+      const qty=Math.min(G.troops[type].available,Math.ceil((farm.def-power)/TROOP_DEF[type].atk));
+      sent[type]=qty;power+=qty*TROOP_DEF[type].atk;
+    });
+    if(power>=farm.def) attackNPC(farm.id,sent);
+  });
+}
+
+// ── DUAL RESEARCH QUEUE ──
+function startResearch2(id){
+  if(blvl('citadel')<3){showSnot('Second queue unlocks at Citadel level 3');return;}
+  if(G.activeResearch2){showSnot('Second queue busy');return;}
+  if(G.research[id]?.completed)return;
+  const rDef=allR().find(r=>r.id===id);if(!rDef)return;
+  if(rDef.req&&!G.research[rDef.req]?.completed){showSnot('Requires prior research');return;}
+  if(G.activeResearch===id){showSnot('Already in first queue');return;}
+  if(!canAfford(rDef.cost)){showSnot('Insufficient resources');return;}
+  spend(rDef.cost);
+  G.activeResearch2=id;G.researchProgress2=0;
+  addLog(`Second queue: researching ${rDef.name}…`);
+  renderResearch();
+}
 function revealB(id){
   if(G.revealedBuildings.includes(id)) return;
   G.revealedBuildings.push(id);
@@ -1464,14 +1765,31 @@ function gameTick(){
     const rDef=allR().find(r=>r.id===G.activeResearch);
     if(rDef&&G.researchProgress>=rDef.time)completeResearch(rDef);
   }
+  // Second research queue
+  if(G.activeResearch2){
+    const resBonus=G.legacyRelics.includes('relic_research')?0.9:1;
+    G.researchProgress2+=resBonus;
+    const rDef2=allR().find(r=>r.id===G.activeResearch2);
+    if(rDef2&&G.researchProgress2>=rDef2.time){
+      G.research[rDef2.id].completed=true;
+      G.activeResearch2=null;G.researchProgress2=0;
+      rDef2.effect();G.prestige+=30;
+      addLog(`Research complete (queue 2): ${rDef2.name}.`,'important');
+      showOverlay(`✦ ${rDef2.name} complete`,'success','Research');
+    }
+  }
   G.heroes.forEach(h=>{if(h.qt>0){h.qt--;if(h.qt<=0)completeQuest(h);}});
-  // Combat checks
-  checkTraining();
-  checkRecovery();
-  checkNPCRespawn();
+  checkTraining();checkRecovery();checkNPCRespawn();
   G.activeRaids.forEach(r=>{if(G.tick>=r.returnAt)resolveRaid(r);});
-  seasonTick();
-  checkVictoryPath();
+  if(G.tick%30===0) checkAutoFarm();
+  if(G.tick%120===0){
+    Object.entries(G.resources).forEach(([k,r])=>{
+      if(r.rate>0&&r.amount/r.max>=0.95){
+        addLog(`⚠ ${r.name} storage nearly full (${Math.floor(r.amount)}/${r.max}) — build storage or spend resources.`,'danger');
+      }
+    });
+  }
+  seasonTick();checkVictoryPath();
   updateBadges();
 }
 
@@ -1526,7 +1844,7 @@ function buildBuilding(id){
   let costs=bDef.cost(nl);
   if(G.costReduction)costs=Object.fromEntries(Object.entries(costs).map(([k,v])=>[k,Math.floor(v*G.costReduction)]));
   if(!canAfford(costs)){showSnot('Insufficient resources');return;}
-  spend(costs);bState.level=nl;bDef.onBuild(nl);G.prestige+=10*nl;
+  spend(costs);bState.level=nl;bDef.onBuild(nl);G.prestige+=10*nl;G.cityDirty=true;
   if(bDef.unlocks)bDef.unlocks.forEach(uid=>revealB(uid));
   addLog(`${bDef.name} upgraded to level ${nl}. ${bDef.eff(nl)}.`,'important');
   const mt=G.mapTiles.find(t=>t.id===id);if(mt)mt.built=true;
@@ -1629,7 +1947,18 @@ function showSnot(msg){
 
 // ── RENDER ──
 function renderAll(){
-  renderResources();renderBuildings();renderMap();renderResearch();renderHeroes();renderFaction();renderCombat();
+  renderResourceBar();
+  renderPower();
+  renderResources();
+  renderBuildings();
+  if(G.cityDirty){renderMap();G.cityDirty=false;}
+  renderResearch();
+  // Only render combat if not currently editing inputs
+  const combatFocused=document.activeElement&&
+    (document.activeElement.closest('#tab-combat'));
+  if(!combatFocused) renderCombat();
+  renderHeroes();
+  renderFaction();
   if(G.logDirty){renderLog();G.logDirty=false;}
   renderPrestige();
   document.getElementById('era-display').textContent=`${G.era} · Year ${G.year}`;
@@ -1644,13 +1973,20 @@ function renderResources(){
   const boost=earlyBoost();
   const bHtml=boost>1?`<div class="boost-row">⚡ Early Kingdom Bonus: ${boost.toFixed(1)}x income active</div>`:'';
   el.innerHTML=bHtml+
-    Object.entries(G.resources).map(([k,r])=>`
-      <div class="rc">
-        <div class="rc-icon">${r.icon}</div>
-        <div class="rc-name">${r.name}</div>
+    Object.entries(G.resources).map(([k,r])=>{
+      const pct=Math.min(100,Math.round((r.amount/r.max)*100));
+      const capColor=pct>=95?'var(--blood-light)':pct>=75?'#e8a020':'var(--forest-light)';
+      const nearCap=pct>=95;
+      return`<div class="rc" style="${nearCap?'border-color:rgba(192,57,43,.4);':''}">
+        <div class="rc-top"><div class="rc-icon">${r.icon}</div><div class="rc-name">${r.name}</div></div>
         <div class="rc-amount">${Math.floor(r.amount)}</div>
         <div class="rc-rate ${r.rate<0?'neg':''}">${r.rate>0?'+':''}${(r.rate*boost).toFixed(1)}/min</div>
-      </div>`).join('');
+        <div class="rc-capbar"><div class="rc-capfill" style="width:${pct}%;background:${capColor}"></div></div>
+        <div style="font-size:8px;color:var(--stone-light);margin-top:2px">${Math.floor(r.amount)}/${r.max}
+          ${nearCap?`<span style="color:var(--blood-light)"> ⚠ Full</span>`:''}
+        </div>
+      </div>`;
+    }).join('');
 }
 
 function renderBuildings(){
@@ -1789,15 +2125,43 @@ function popupUpgrade(){
 function renderResearch(){
   const el=document.getElementById('research-list');if(!el)return;
   const tab=G.activeResearchTab;
+
+  // Dual queue display
+  const q1Def=G.activeResearch?allR().find(r=>r.id===G.activeResearch):null;
+  const q2Def=G.activeResearch2?allR().find(r=>r.id===G.activeResearch2):null;
+  const q1Pct=q1Def?Math.round((G.researchProgress/q1Def.time)*100):0;
+  const q2Pct=q2Def?Math.round((G.researchProgress2/q2Def.time)*100):0;
+  const citLvl=blvl('citadel');
+
+  const queueHtml=`<div class="research-queue">
+    <div class="rqueue-slot ${q1Def?'active':''}">
+      ${q1Def?`<div style="width:100%">
+        <div style="font-family:'Cinzel',serif;font-size:10px;color:var(--gold);margin-bottom:4px">Queue 1: ${q1Def.name}</div>
+        <div class="research-progress"><div class="research-progress-inner" style="width:${q1Pct}%"></div></div>
+        <div style="font-size:10px;color:var(--stone-light);margin-top:3px">${q1Pct}% · ${Math.ceil((q1Def.time-G.researchProgress)/60)}m remaining</div>
+      </div>`:`<div class="rqueue-empty">Queue 1 — tap a research to start</div>`}
+    </div>
+    <div class="rqueue-slot ${q2Def?'active':''}" style="${citLvl<3?'opacity:.4':''}">
+      ${citLvl<3?`<div class="rqueue-empty">🔒 Queue 2 — unlocks at Citadel level 3</div>`:
+        q2Def?`<div style="width:100%">
+          <div style="font-family:'Cinzel',serif;font-size:10px;color:var(--gold);margin-bottom:4px">Queue 2: ${q2Def.name}</div>
+          <div class="research-progress"><div class="research-progress-inner" style="width:${q2Pct}%;background:var(--forest-light)"></div></div>
+          <div style="font-size:10px;color:var(--stone-light);margin-top:3px">${q2Pct}% · ${Math.ceil((q2Def.time-G.researchProgress2)/60)}m remaining</div>
+        </div>`:`<div class="rqueue-empty">Queue 2 — tap a research to queue it</div>`
+      }
+    </div>
+  </div>`;
+
   if(!G.unlockedResearchTabs.includes(tab)){
-    el.innerHTML=`<div style="font-size:13px;color:var(--stone-light);font-style:italic;padding:8px">This branch is not yet unlocked. Build more to reveal it.</div>`;return;
+    el.innerHTML=queueHtml+`<div style="font-size:13px;color:var(--stone-light);font-style:italic;padding:8px">This branch is not yet unlocked.</div>`;return;
   }
   const items=RD[tab]||[];
   let prog=0;
   if(G.activeResearch){const r=allR().find(x=>x.id===G.activeResearch);if(r)prog=Math.round((G.researchProgress/r.time)*100);}
-  el.innerHTML=items.map(rDef=>{
+  el.innerHTML=queueHtml+items.map(rDef=>{
     const done=G.research[rDef.id]?.completed;
     const isAct=G.activeResearch===rDef.id;
+    const isAct2=G.activeResearch2===rDef.id;
     const vis=rviz(rDef.id);
     const reqMet=!rDef.req||G.research[rDef.req]?.completed;
     const locked=!reqMet&&!done;
@@ -1806,13 +2170,17 @@ function renderResearch(){
       const ok=G.resources[r]?.amount>=a;
       return `<span style="font-size:11px;color:${ok?'var(--parchment-dark)':'var(--blood-light)'}">${G.resources[r]?.icon||r}${a}</span>`;
     }).join(' ');
-    return`<div class="ritem ${done?'rcompleted':''} ${locked?'rlocked':''} ${isAct?'ractive':''}"
-         onclick="${!done&&!locked&&!G.activeResearch?`startResearch('${rDef.id}')`:''}" >
-      <div class="rname">${done?'✓ ':''}${rDef.name}</div>
+    const canQ2=citLvl>=3&&!done&&!locked&&!G.activeResearch2&&G.activeResearch!==rDef.id;
+    return`<div class="ritem ${done?'rcompleted':''} ${locked?'rlocked':''} ${isAct||isAct2?'ractive':''}">
+      <div class="rname" style="display:flex;justify-content:space-between;align-items:center">
+        <span>${done?'✓ ':''}${rDef.name}</span>
+        ${canQ2?`<button onclick="startResearch2('${rDef.id}')" style="font-size:8px;padding:2px 5px;background:rgba(74,122,50,.15);border:1px solid rgba(74,122,50,.3);border-radius:2px;color:var(--forest-light);cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.5px;touch-action:manipulation">+Q2</button>`:''}
+      </div>
       <div class="rdesc">${rDef.desc}</div>
       ${locked?`<div style="font-size:11px;color:var(--blood-light);font-style:italic">Requires: ${rDef.req}</div>`:''}
       ${!done&&!locked?`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${cHtml}<span style="font-size:11px;color:var(--stone-light)">· ${Math.round(rDef.time/60)} min</span></div>`:''}
       ${isAct?`<div class="rprog"><div class="rprog-inner" style="width:${prog}%"></div></div>`:''}
+      ${isAct2?`<div class="rprog"><div class="rprog-inner" style="width:${q2Pct}%;background:var(--forest-light)"></div></div>`:''}
     </div>`;
   }).join('');
 }
@@ -1855,6 +2223,29 @@ function renderFaction(){
       <div class="ftrait"><div class="ftrait-name">Diplomatic Mastery</div><div class="ftrait-desc">Can form vassal treaties. Tribute scales with prestige.</div></div>
       <div class="ftrait"><div class="ftrait-name">Balanced Arts</div><div class="ftrait-desc">All research branches cost the same. Master of all paths.</div></div>
       ${G.legacyRelics.length?`<div class="ftrait"><div class="ftrait-name">Legacy Relics</div><div class="ftrait-desc">${G.legacyRelics.map(r=>({relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[r]||r)).join(' · ')}</div></div>`:''}
+    </div>
+
+    <div class="section">
+      <div class="section-title">🛡 Kingdom Defence</div>
+      <div class="defence-card">
+        <div class="def-row"><span class="def-title">Wall Defence</span><span class="def-val">${G.wallDefence||0}</span></div>
+        <div class="def-bar"><div class="def-fill" style="width:${Math.min(100,((G.wallDefence||0)/500)*100)}%"></div></div>
+        <div style="font-size:11px;color:var(--stone-light);margin-top:6px;font-style:italic">
+          ${G.watchtowerUnlocked?'✓ Watchtower active — raid warnings enabled':'Build Citadel Lv2 to unlock Watchtower'}
+        </div>
+        <div style="font-size:11px;color:var(--stone-light);margin-top:4px;font-style:italic">
+          Garrison: ${Object.entries(G.garrison||{}).filter(([,v])=>v>0).map(([k,v])=>`${TROOP_DEF[k]?.icon||k}${v}`).join(' ')||'None assigned'}
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">⚔ War Chest</div>
+      ${renderWarChest()}
+      <div style="font-size:11px;color:var(--stone-light);font-style:italic;line-height:1.5">
+        War chest funds multiplayer raids and diplomacy. Decays 2%/day if inactive.
+        Men of the West pay 10% less on conversions via Diplomatic Mastery.
+      </div>
     </div>
 
     <div class="section">
