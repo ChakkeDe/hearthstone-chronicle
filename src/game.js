@@ -97,6 +97,7 @@ function checkForUpdate(){
 }
 
 function showUpdateBanner(){
+  if(document.getElementById('update-banner'))return;
   const el=document.createElement('div');
   el.id='update-banner';
   el.style.cssText=`position:fixed;bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 8px);
@@ -113,6 +114,26 @@ function showUpdateBanner(){
     <button onclick="this.parentElement.remove()" style="background:none;border:none;
       color:var(--stone-light);font-size:16px;cursor:pointer;padding:0 4px;touch-action:manipulation;">✕</button>`;
   document.body.appendChild(el);
+}
+
+async function manualCheckForUpdate(){
+  if(!('serviceWorker' in navigator)){
+    showSnot('Updates are not supported in this browser');
+    return;
+  }
+  showSnot(`Checking for updates — v${APP_VERSION}`);
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    await reg.update();
+    if(reg.waiting){
+      showUpdateBanner();
+      showSnot('Update ready to install');
+      return;
+    }
+    showSnot(`You are running v${APP_VERSION}`);
+  }catch(e){
+    showSnot('Could not check for updates');
+  }
 }
 
 function applyUpdate(){
@@ -1610,7 +1631,9 @@ function renderFaction(){
     </div>
 
     <div class="section">
-      <div class="section-title">☁ Cloud Save (Supabase)</div>
+      <div class="section-title">☁ Cloud Save & Updates</div>
+      <div style="font-size:12px;color:var(--stone-light);font-style:italic;margin-bottom:8px">Installed version: <span style="color:var(--gold);font-family:'Cinzel',serif">v${APP_VERSION}</span></div>
+      <button onclick="manualCheckForUpdate()" style="width:100%;padding:7px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:3px;color:var(--gold);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-bottom:10px">Check for Update</button>
       ${G.supabaseUrl?
         `<div style="font-size:12px;color:var(--forest-light);margin-bottom:10px">✓ Cloud save connected</div>
          <button onclick="cloudSave()" style="width:100%;padding:7px;background:rgba(74,122,50,.1);border:1px solid rgba(74,122,50,.3);border-radius:3px;color:var(--forest-light);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-bottom:6px">Save to Cloud Now</button>
