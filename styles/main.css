@@ -310,6 +310,9 @@ body::before{content:'';position:fixed;inset:0;
 .npc-level{font-size:9px;color:var(--gold);background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);border-radius:2px;padding:1px 5px;font-family:'Cinzel',serif;}
 .npc-loot{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:11px;color:var(--stone-light);}
 .npc-defence{font-size:11px;color:var(--blood-light);font-style:italic;margin-bottom:6px;}
+.npc-power-row{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-family:'Cinzel',serif;color:var(--blood-light);margin-bottom:6px;}
+.npc-power-row .ok{color:var(--forest-light);}
+.npc-power-row .low{color:var(--blood-light);}
 .attack-btn{width:100%;padding:5px;background:rgba(139,26,26,.12);border:1px solid rgba(139,26,26,.35);
   border-radius:3px;color:#d4826a;font-family:'Cinzel',serif;font-size:9px;
   letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s;}
@@ -340,10 +343,12 @@ body::before{content:'';position:fixed;inset:0;
   padding-right:max(12px, env(safe-area-inset-right));}
 #resource-bar::-webkit-scrollbar{height:0;}
 #resource-bar-inner{display:flex;gap:10px;align-items:center;min-width:max-content;}
-.fres{display:flex;align-items:center;gap:4px;cursor:default;}
+.fres{display:flex;align-items:center;gap:4px;cursor:pointer;touch-action:manipulation;}
 .fres-icon{font-size:13px;}
 .fres-info{display:flex;flex-direction:column;}
 .fres-amt{font-family:'Cinzel',serif;font-size:11px;color:var(--parchment);line-height:1;}
+.fres-rate{font-size:9px;color:var(--forest-light);line-height:1;margin-top:1px;}
+.fres-rate.neg{color:var(--blood-light);}
 .fres-bar{width:36px;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;margin-top:2px;}
 .fres-fill{height:100%;border-radius:2px;transition:width .5s,background .5s;}
 .fres-fill.low{background:var(--forest-light);}

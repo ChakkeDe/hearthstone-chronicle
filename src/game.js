@@ -79,8 +79,8 @@ function researchSpeedMultiplier(){
   return G.legacyRelics.includes('relic_research') ? (1/0.9) : 1;
 }
 
-const APP_VERSION = '0.7.3';
-const CACHE_VERSION = 'hc-v22';
+const APP_VERSION = '0.7.4';
+const CACHE_VERSION = 'hc-v23';
 
 // ── UPDATE CHECKER ──
 let _updateReloading=false;
@@ -680,6 +680,12 @@ function calcAttackPower(sent){
   },0);
 }
 
+function calcReadyTroopPower(){
+  return Object.entries(G.troops).reduce((sum,[type,t])=>{
+    return sum+(TROOP_DEF[type]?.atk||0)*(t.available||0);
+  },0);
+}
+
 function calcLootCapacity(sent){
   return Object.entries(sent).reduce((sum,[type,qty])=>{
     return sum+(TROOP_DEF[type]?.carry||0)*qty;
@@ -803,6 +809,7 @@ function checkNPCRespawn(){
 function renderCombat(){
   const tab=document.getElementById('tab-combat');if(!tab)return;
   const barracksLvl=blvl('barracks');
+  const readyPower=calcReadyTroopPower();
 
   if(barracksLvl===0){
     tab.innerHTML=`<div class="section"><div class="section-title">⚔ Combat</div>
@@ -878,13 +885,17 @@ function renderCombat(){
   const npcHtml=G.npcFarms.map(farm=>{
     const lootStr=Object.entries(farm.loot).map(([r,v])=>`${G.resources[r]?.icon||r}${v}`).join(' ');
     const minsToRespawn=farm.available?0:Math.ceil((farm.respawnAt-G.tick)/60);
+    const canBeat=readyPower>=farm.def;
     return`<div class="npc-card ${farm.available?'':''}">
       <div class="npc-header">
         <span class="npc-name">${farm.icon} ${farm.name}</span>
         <span class="npc-level">Lv ${farm.level}</span>
       </div>
       <div class="npc-loot">Loot: ${lootStr}</div>
-      <div class="npc-defence">Defence: ${farm.def} power required</div>
+      <div class="npc-power-row">
+        <span>Required: ${farm.def}</span>
+        <span class="${canBeat?'ok':'low'}">Ready: ${readyPower}</span>
+      </div>
       ${!farm.available?
         `<div style="font-size:11px;color:var(--stone-light);font-style:italic">Respawns in ${minsToRespawn}m</div>`
         :`<div style="font-size:10px;color:var(--gold-dark);margin-bottom:6px;font-family:'Cinzel',serif">Send troops:</div>
@@ -980,15 +991,16 @@ function renderPower(){
 // ── FLOATING RESOURCE BAR ──
 function renderResourceBar(){
   const el=document.getElementById('resource-bar-inner');if(!el)return;
-  const boost=earlyBoost();
   el.innerHTML=Object.entries(G.resources).map(([k,r],i)=>{
     const pct=Math.min(100,Math.round((r.amount/r.max)*100));
     const cls=pct>=90?'high':pct>=75?'med':'low';
+    const gain=effectiveResourceRate(k);
     const sep=i>0?'<div class="fres-sep"></div>':'';
-    return`${sep}<div class="fres">
+    return`${sep}<div class="fres" data-resource-card="${k}" role="button" tabindex="0" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()">
       <div class="fres-icon">${r.icon}</div>
       <div class="fres-info">
         <div class="fres-amt">${Math.floor(r.amount)}</div>
+        <div class="fres-rate ${gain<0?'neg':''}">${gain>0?'+':''}${gain.toFixed(1)}/m</div>
         <div class="fres-bar"><div class="fres-fill ${cls}" style="width:${pct}%"></div></div>
       </div>
     </div>`;
@@ -1426,10 +1438,10 @@ function renderResources(){
       const capColor=pct>=95?'var(--blood-light)':pct>=75?'#e8a020':'var(--forest-light)';
       const nearCap=pct>=95;
       const gain=effectiveResourceRate(k);
-      return`<div class="rc" data-resource-card="${k}" role="button" tabindex="0" title="Storage time" style="${nearCap?'border-color:rgba(192,57,43,.4);':''}">
+      return`<div class="rc" data-resource-card="${k}" role="button" tabindex="0" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()" title="Storage time" style="${nearCap?'border-color:rgba(192,57,43,.4);':''}">
         <div class="rc-top"><div class="rc-icon">${r.icon}</div><div class="rc-name">${r.name}</div></div>
-        <div class="rc-amount">${Math.floor(r.amount)}</div>
-        <div class="rc-rate ${gain<0?'neg':''}">${gain>0?'+':''}${gain.toFixed(1)}/min</div>
+        <div class="rc-amount" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()">${Math.floor(r.amount)}</div>
+        <div class="rc-rate ${gain<0?'neg':''}" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()">${gain>0?'+':''}${gain.toFixed(1)}/min</div>
         <div class="rc-capbar"><div class="rc-capfill" style="width:${pct}%;background:${capColor}"></div></div>
         <div style="font-size:8px;color:var(--stone-light);margin-top:2px">${Math.floor(r.amount)}/${r.max}
           ${nearCap?`<span style="color:var(--blood-light)"> ⚠ Full</span>`:''}
@@ -1442,8 +1454,7 @@ function renderResources(){
 let _lastResourceTap=0;
 
 function attachResourceCardClicks(){
-  const el=document.getElementById('resource-grid');if(!el||el._resourceClicksAttached)return;
-  el._resourceClicksAttached=true;
+  const grids=[document.getElementById('resource-grid'),document.getElementById('resource-bar-inner')].filter(Boolean);
   const onResourceTap=e=>{
     if(!e.target.closest('[data-resource-card]'))return;
     const now=Date.now();
@@ -1452,12 +1463,16 @@ function attachResourceCardClicks(){
     e.preventDefault();
     showResourceStorageTimes();
   };
-  el.addEventListener('click',onResourceTap);
-  el.addEventListener('touchend',onResourceTap,{passive:false});
-  el.addEventListener('pointerup',onResourceTap);
-  el.addEventListener('keydown',e=>{
-    if(!e.target.closest('[data-resource-card]'))return;
-    if(e.key==='Enter'||e.key===' '){e.preventDefault();showResourceStorageTimes();}
+  grids.forEach(el=>{
+    if(el._resourceClicksAttached)return;
+    el._resourceClicksAttached=true;
+    el.addEventListener('click',onResourceTap);
+    el.addEventListener('touchend',onResourceTap,{passive:false});
+    el.addEventListener('pointerup',onResourceTap);
+    el.addEventListener('keydown',e=>{
+      if(!e.target.closest('[data-resource-card]'))return;
+      if(e.key==='Enter'||e.key===' '){e.preventDefault();showResourceStorageTimes();}
+    });
   });
 }
 
@@ -1502,6 +1517,7 @@ function renderResourceForecast(){
 function showResourceStorageTimes(){
   G.resourceForecastOpen=true;
   renderResources();
+  attachResourceCardClicks();
   showSnot('Storage forecast opened');
 }
 
