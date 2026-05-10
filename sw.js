@@ -1,4 +1,4 @@
-const CACHE = 'hc-v32';
+﻿const CACHE = 'hc-v33';
 const ASSETS = [
   './',
   './index.html',
@@ -63,3 +63,4 @@ self.addEventListener('fetch', e => {
 self.addEventListener('message', e => {
   if(e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
+
