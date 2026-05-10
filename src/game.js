@@ -153,6 +153,8 @@ function applyUpdate(){
 // 3. If clock went backwards vs last known server time: skip offline progress entirely
 
 let _serverTimeOffset=0; // ms difference between server and local clock, calibrated on cloud load
+let _offlineReady=false;
+let _offlineApplying=false;
 
 async function fetchServerTime(){
   // Supabase exposes a lightweight endpoint we can use to get real server time
@@ -179,21 +181,24 @@ function getReliableNow(){
 }
 
 async function applyOfflineProgress(){
+  if(_offlineApplying)return false;
+  _offlineApplying=true;
   const reliableNow=getReliableNow();
 
-  // --- Tamper detection ---
-  // G.lastServerTime is the last real server timestamp we recorded
-  // If local clock is behind it, the clock was wound back — skip
-  if(G.lastServerTime&&reliableNow<G.lastServerTime-5000){
-    addLog('⚠ Time anomaly detected. Offline progress skipped.','danger');
-    showOverlay('Time anomaly detected.\nOffline progress skipped.','danger','Security Check');
-    G.lastSaveTime=reliableNow;
-    G.lastServerTime=reliableNow;
-    return;
-  }
+  try{
+    // --- Tamper detection ---
+    // G.lastServerTime is the last real server timestamp we recorded
+    // If local clock is behind it, the clock was wound back — skip
+    if(G.lastServerTime&&reliableNow<G.lastServerTime-5000){
+      addLog('⚠ Time anomaly detected. Offline progress skipped.','danger');
+      showOverlay('Time anomaly detected.\nOffline progress skipped.','danger','Security Check');
+      G.lastSaveTime=reliableNow;
+      G.lastServerTime=reliableNow;
+      return false;
+    }
 
-  // Calculate elapsed from last save
-  const rawElapsed=(reliableNow-(G.lastSaveTime||reliableNow))/1000;
+    // Calculate elapsed from last save
+    const rawElapsed=(reliableNow-(G.lastSaveTime||reliableNow))/1000;
 
   // --- Tick cross-check for non-cloud players ---
   // The game tick increments every real second while the game is open.
@@ -215,8 +220,8 @@ async function applyOfflineProgress(){
   }
 
   // Hard cap at offlineCapHours regardless
-  elapsed=Math.min(elapsed, G.offlineCapHours*3600);
-  if(elapsed<30) return;
+    elapsed=Math.min(elapsed, G.offlineCapHours*3600);
+    if(elapsed<30)return false;
 
   const boost=earlyBoost();
   const ticks=Math.floor(elapsed);
@@ -298,9 +303,25 @@ async function applyOfflineProgress(){
   showOverlay(`Welcome back!\nKingdom progressed ${label} offline.`,'success','Offline Progress');
 
   // Update timestamps
-  G.lastSaveTime=reliableNow;
-  G.lastServerTime=reliableNow;
-  G._tickAtLastLoad=G.tick;
+    G.lastSaveTime=reliableNow;
+    G.lastServerTime=reliableNow;
+    G._tickAtLastLoad=G.tick;
+    return true;
+  }finally{
+    _offlineApplying=false;
+  }
+}
+
+function handleAppBackground(){
+  if(!_offlineReady)return;
+  saveGame();
+}
+
+async function handleAppForeground(){
+  if(!_offlineReady)return;
+  const progressed=await applyOfflineProgress();
+  if(progressed)renderAll();
+  saveGame();
 }
 
 // ── VICTORY PATHS ──
@@ -1076,13 +1097,21 @@ function init(){
   setInterval(()=>cloudSave(),120000);
   requestAnimationFrame(animateTickBar);
   checkForUpdate();
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='hidden')handleAppBackground();
+    if(document.visibilityState==='visible')handleAppForeground();
+  });
+  window.addEventListener('pagehide',handleAppBackground);
+  window.addEventListener('pageshow',e=>{if(e.persisted)handleAppForeground();});
   cloudLoad().then(loaded=>{
     if(!loaded){
       loadGame();
       G._tickAtLastLoad=G.tick;
     }
-    applyOfflineProgress();
-    renderAll();
+    applyOfflineProgress().then(()=>{
+      _offlineReady=true;
+      renderAll();
+    });
   });
 }
 
