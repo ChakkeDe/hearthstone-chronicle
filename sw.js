@@ -1,8 +1,11 @@
-const CACHE = 'hc-v12';
+const CACHE = 'hc-v13';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './styles/main.css',
+  './src/pwa.js',
+  './src/game.js',
 ];
 
 self.addEventListener('install', e => {
