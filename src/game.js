@@ -78,8 +78,8 @@ function researchSpeedMultiplier(){
   return G.legacyRelics.includes('relic_research') ? (1/0.9) : 1;
 }
 
-const APP_VERSION = '0.7.6';
-const CACHE_VERSION = 'hc-v25';
+const APP_VERSION = '0.7.7';
+const CACHE_VERSION = 'hc-v26';
 
 // ── UPDATE CHECKER ──
 let _updateReloading=false;
