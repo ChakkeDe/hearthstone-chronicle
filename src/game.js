@@ -56,7 +56,6 @@ const G={
   // ── UI FLAGS ──
   cityDirty:true,
   logDirty:true,
-  resourceForecastOpen:false,
   // ── KINGDOM IDENTITY ──
   kingdomName:'Arnethia',
   playerName:'',
@@ -79,8 +78,8 @@ function researchSpeedMultiplier(){
   return G.legacyRelics.includes('relic_research') ? (1/0.9) : 1;
 }
 
-const APP_VERSION = '0.7.4';
-const CACHE_VERSION = 'hc-v23';
+const APP_VERSION = '0.7.5';
+const CACHE_VERSION = 'hc-v24';
 
 // ── UPDATE CHECKER ──
 let _updateReloading=false;
@@ -995,12 +994,14 @@ function renderResourceBar(){
     const pct=Math.min(100,Math.round((r.amount/r.max)*100));
     const cls=pct>=90?'high':pct>=75?'med':'low';
     const gain=effectiveResourceRate(k);
+    const capText=resourceCapText(k,r);
     const sep=i>0?'<div class="fres-sep"></div>':'';
     return`${sep}<div class="fres" data-resource-card="${k}" role="button" tabindex="0" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()">
       <div class="fres-icon">${r.icon}</div>
       <div class="fres-info">
         <div class="fres-amt">${Math.floor(r.amount)}</div>
         <div class="fres-rate ${gain<0?'neg':''}">${gain>0?'+':''}${gain.toFixed(1)}/m</div>
+        <div class="fres-cap">${capText}</div>
         <div class="fres-bar"><div class="fres-fill ${cls}" style="width:${pct}%"></div></div>
       </div>
     </div>`;
@@ -1438,17 +1439,18 @@ function renderResources(){
       const capColor=pct>=95?'var(--blood-light)':pct>=75?'#e8a020':'var(--forest-light)';
       const nearCap=pct>=95;
       const gain=effectiveResourceRate(k);
+      const capText=resourceCapText(k,r);
       return`<div class="rc" data-resource-card="${k}" role="button" tabindex="0" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()" title="Storage time" style="${nearCap?'border-color:rgba(192,57,43,.4);':''}">
         <div class="rc-top"><div class="rc-icon">${r.icon}</div><div class="rc-name">${r.name}</div></div>
         <div class="rc-amount" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()">${Math.floor(r.amount)}</div>
         <div class="rc-rate ${gain<0?'neg':''}" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()">${gain>0?'+':''}${gain.toFixed(1)}/min</div>
+        <div class="rc-captext">${capText}</div>
         <div class="rc-capbar"><div class="rc-capfill" style="width:${pct}%;background:${capColor}"></div></div>
         <div style="font-size:8px;color:var(--stone-light);margin-top:2px">${Math.floor(r.amount)}/${r.max}
           ${nearCap?`<span style="color:var(--blood-light)"> ⚠ Full</span>`:''}
         </div>
       </div>`;
-    }).join('')+
-    (G.resourceForecastOpen?renderResourceForecast():'');
+    }).join('');
 }
 
 let _lastResourceTap=0;
@@ -1500,25 +1502,17 @@ function resourceCapLine(key,r){
   return `${r.icon} ${r.name}: ${formatCapDuration((r.max-r.amount)/gain)} to max`;
 }
 
-function renderResourceForecast(){
-  return `<div class="resource-forecast">
-    <div class="resource-forecast-title">Storage Forecast</div>
-    ${Object.entries(G.resources).map(([k,r])=>{
-      const gain=effectiveResourceRate(k);
-      const status=r.amount>=r.max?'Full':gain<=0?'No gain':formatCapDuration((r.max-r.amount)/gain);
-      return `<div class="resource-forecast-row">
-        <span>${r.icon} ${r.name}</span>
-        <span>${status}</span>
-      </div>`;
-    }).join('')}
-  </div>`;
+function resourceCapText(key,r){
+  if(r.amount>=r.max)return 'Full';
+  const gain=effectiveResourceRate(key);
+  if(gain<=0)return 'No gain';
+  return `${formatCapDuration((r.max-r.amount)/gain)} to full`;
 }
 
 function showResourceStorageTimes(){
-  G.resourceForecastOpen=true;
   renderResources();
   attachResourceCardClicks();
-  showSnot('Storage forecast opened');
+  showSnot('Storage forecast is shown on each resource');
 }
 
 function renderBuildings(){
