@@ -1301,9 +1301,9 @@ function showOverlay(msg,type='',title=''){
   s.appendChild(el);
   setTimeout(()=>{el.style.animation='nOut .3s ease forwards';setTimeout(()=>el.remove(),320);},3500);
 }
-function showSnot(msg){
+function showSnot(msg,duration=2500){
   const el=document.createElement('div');el.className='snot';el.textContent=msg;
-  document.body.appendChild(el);setTimeout(()=>el.remove(),2500);
+  document.body.appendChild(el);setTimeout(()=>el.remove(),duration);
 }
 
 // ── RENDER ──
@@ -1338,16 +1338,46 @@ function renderResources(){
       const pct=Math.min(100,Math.round((r.amount/r.max)*100));
       const capColor=pct>=95?'var(--blood-light)':pct>=75?'#e8a020':'var(--forest-light)';
       const nearCap=pct>=95;
-      return`<div class="rc" style="${nearCap?'border-color:rgba(192,57,43,.4);':''}">
+      const gain=effectiveResourceRate(k);
+      return`<div class="rc" onclick="showResourceStorageTimes()" title="Storage time" style="${nearCap?'border-color:rgba(192,57,43,.4);':''}">
         <div class="rc-top"><div class="rc-icon">${r.icon}</div><div class="rc-name">${r.name}</div></div>
         <div class="rc-amount">${Math.floor(r.amount)}</div>
-        <div class="rc-rate ${r.rate<0?'neg':''}">${r.rate>0?'+':''}${(r.rate*boost).toFixed(1)}/min</div>
+        <div class="rc-rate ${gain<0?'neg':''}">${gain>0?'+':''}${gain.toFixed(1)}/min</div>
         <div class="rc-capbar"><div class="rc-capfill" style="width:${pct}%;background:${capColor}"></div></div>
         <div style="font-size:8px;color:var(--stone-light);margin-top:2px">${Math.floor(r.amount)}/${r.max}
           ${nearCap?`<span style="color:var(--blood-light)"> ⚠ Full</span>`:''}
         </div>
       </div>`;
     }).join('');
+}
+
+function effectiveResourceRate(key){
+  const r=G.resources[key];if(!r)return 0;
+  const rally=G._rallied&&G.tick<=G._rallyEnd;
+  let gain=(r.rate||0)*earlyBoost()*(rally?2:1);
+  if(key==='iron')gain+=blvl('mine')*0.2;
+  return gain;
+}
+
+function formatCapDuration(minutes){
+  if(minutes<1)return '<1 min';
+  if(minutes<60)return `${Math.ceil(minutes)} min`;
+  const h=Math.floor(minutes/60),m=Math.ceil(minutes%60);
+  if(h<24)return m>=60?`${h+1}h`:`${h}h ${m}m`;
+  const d=Math.floor(h/24),rh=h%24;
+  return rh?`${d}d ${rh}h`:`${d}d`;
+}
+
+function resourceCapLine(key,r){
+  if(r.amount>=r.max)return `${r.icon} ${r.name}: full`;
+  const gain=effectiveResourceRate(key);
+  if(gain<=0)return `${r.icon} ${r.name}: no gain`;
+  return `${r.icon} ${r.name}: ${formatCapDuration((r.max-r.amount)/gain)} to max`;
+}
+
+function showResourceStorageTimes(){
+  const lines=Object.entries(G.resources).map(([k,r])=>resourceCapLine(k,r));
+  showSnot(lines.join('\n'),5200);
 }
 
 function renderBuildings(){
