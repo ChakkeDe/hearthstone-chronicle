@@ -443,7 +443,7 @@ body::before{content:'';position:fixed;inset:0;
 <div id="header">
   <div>
     <h1>Hearthstone Chronicles</h1>
-    <div class="sub">Age of the First Kings</div>
+    <div class="sub">Age of the First Kings · v0.7.0</div>
   </div>
   <div style="display:flex;align-items:center;gap:8px;">
     <div id="power-badge">⚔ <span id="power-val">0</span></div>
@@ -609,6 +609,14 @@ const G={
   // ── UI FLAGS ──
   cityDirty:true,
   logDirty:true,
+  // ── KINGDOM IDENTITY ──
+  kingdomName:'Arnethia',
+  playerName:'',
+  // ── TUTORIAL ──
+  tutorialStep:0,
+  tutorialDone:false,
+  // ── MILESTONES ──
+  milestonesReached:[],
   // Supabase config
   supabaseUrl:'',supabaseKey:'',
 };
@@ -619,7 +627,7 @@ function earlyBoost(){
   return Math.max(1, 5-(t*0.16));
 }
 
-const APP_VERSION = '0.6.0';
+const APP_VERSION = '0.7.0';
 
 // ── UPDATE CHECKER ──
 function checkForUpdate(){
@@ -741,19 +749,74 @@ async function applyOfflineProgress(){
   const boost=earlyBoost();
   const ticks=Math.floor(elapsed);
 
-  // Apply gains
+  // ── ADVANCE G.tick first — this fixes ALL absolute-tick timers ──
+  // Troop training, hospital, raids, respawns all use G.tick comparisons
+  G.tick+=ticks;
+
+  // Resources
   Object.values(G.resources).forEach(r=>{
     if(r.rate>0) r.amount=Math.min(r.max, r.amount+(r.rate*boost/60)*ticks);
   });
-  if(G.prestigeRate>0) G.prestige=Math.min(G.prestigeGoal, G.prestige+(G.prestigeRate/60)*ticks);
+
+  // Prestige
+  const pRate=1+(G.prestigeRate>0?G.prestigeRate*(1+(G.victoryBonus/100)):0);
+  G.prestige=Math.min(G.prestigeGoal, G.prestige+(pRate/60)*ticks);
+
+  // Research queue 1
   if(G.activeResearch){
     G.researchProgress=Math.min(G.researchProgress+ticks,99999);
     const rDef=allR().find(r=>r.id===G.activeResearch);
     if(rDef&&G.researchProgress>=rDef.time) completeResearch(rDef);
   }
+
+  // Research queue 2
+  if(G.activeResearch2){
+    G.researchProgress2=Math.min(G.researchProgress2+ticks,99999);
+    const rDef2=allR().find(r=>r.id===G.activeResearch2);
+    if(rDef2&&G.researchProgress2>=rDef2.time){
+      G.research[rDef2.id].completed=true;
+      rDef2.effect();G.prestige+=30;
+      G.activeResearch2=null;G.researchProgress2=0;
+      addLog(`Research complete (offline): ${rDef2.name}.`,'important');
+    }
+  }
+
+  // Hero quests
   G.heroes.forEach(h=>{
     if(h.onQuest&&h.qt>0){h.qt=Math.max(0,h.qt-ticks);if(h.qt<=0)completeQuest(h);}
   });
+
+  // Troop training — now works because G.tick was advanced
+  Object.entries(G.troops).forEach(([type,t])=>{
+    if(t.training>0&&G.tick>=t.trainEnd){
+      t.available+=t.training;t.total+=t.training;
+      addLog(`${t.training} ${TROOP_DEF[type].name} finished training (offline).`,'important');
+      t.training=0;t.trainEnd=0;
+    }
+  });
+
+  // Hospital recovery
+  if(G.hospital.recovering>0&&G.tick>=G.hospital.recoverEnd){
+    let rem=G.hospital.recovering;
+    Object.values(G.troops).forEach(t=>{const r=Math.min(t.injured,rem);t.injured-=r;t.available+=r;rem-=r;});
+    addLog(`${G.hospital.recovering} troops recovered while you were away.`,'important');
+    G.hospital.recovering=0;
+  }
+
+  // Raids returned
+  G.activeRaids.forEach(r=>{if(G.tick>=r.returnAt)resolveRaid(r);});
+
+  // NPC respawns
+  G.npcFarms.forEach(f=>{if(!f.available&&G.tick>=f.respawnAt)f.available=true;});
+
+  // Season advance
+  const weekTicks=Math.floor(ticks/TICKS_PER_WEEK);
+  if(weekTicks>0){
+    G.seasonWeek=Math.min(SEASON_WEEKS,G.seasonWeek+weekTicks);
+    G.seasonTick=ticks%TICKS_PER_WEEK;
+  }
+
+  // Year advance
   G.year+=Math.floor(ticks/300);
 
   const mins=Math.round(elapsed/60);
@@ -1167,10 +1230,10 @@ const RD={
 
 // ── COMBAT DEFINITIONS ──
 const TROOP_DEF={
-  infantry:{name:'Infantry',icon:'🗡',atk:10,def:15,carry:20,speed:60, trainTime:30,cost:{food:10,iron:5},  reqBarracks:1,desc:'Sturdy front-line fighters. Strong defence.'},
-  archers: {name:'Archers', icon:'🏹',atk:14,def:8, carry:15,speed:90, trainTime:45,cost:{wood:15,iron:8},  reqBarracks:2,desc:'Ranged attackers. High loot efficiency.'},
-  cavalry: {name:'Cavalry', icon:'🐎',atk:20,def:12,carry:40,speed:45, trainTime:90,cost:{food:20,iron:15}, reqBarracks:3,desc:'Fast raiders. Best loot capacity.'},
-  siege:   {name:'Siege',   icon:'🏹',atk:35,def:5, carry:10,speed:120,trainTime:180,cost:{wood:40,iron:30},reqBarracks:4,desc:'Destroys walls. PvP only — no NPC use.'},
+  infantry:{name:'Infantry',icon:'🗡',atk:10,def:15,carry:20,speed:60, trainTime:8, cost:{food:10,iron:5},  reqBarracks:1,desc:'Sturdy front-line fighters. Strong defence.'},
+  archers: {name:'Archers', icon:'🏹',atk:14,def:8, carry:15,speed:90, trainTime:12,cost:{wood:15,iron:8},  reqBarracks:2,desc:'Ranged attackers. High loot efficiency.'},
+  cavalry: {name:'Cavalry', icon:'🐎',atk:20,def:12,carry:40,speed:45, trainTime:25,cost:{food:20,iron:15}, reqBarracks:3,desc:'Fast raiders. Best loot capacity.'},
+  siege:   {name:'Siege',   icon:'🏹',atk:35,def:5, carry:10,speed:120,trainTime:60,cost:{wood:40,iron:30},reqBarracks:4,desc:'Destroys walls. PvP only — no NPC use.'},
 };
 
 const NPC_FARMS=[
@@ -1506,11 +1569,12 @@ function launchAttack(farmId){
 const HERO_NAMES=['Aldric the Bold','Seraphina Dawnblade','Torren Ironfist','Lyra Swiftarrow','Caelen of the Vale'];
 const HERO_CLS=['Knight','Ranger','Mage','Warrior','Scout'];
 const QUESTS=[
-  {name:'Border Skirmish',minP:5, t:120,rew:{gold:30,iron:10},xp:20,danger:.1},
-  {name:'Forest Hunt',    minP:8, t:180,rew:{food:50,wood:30},xp:35,danger:.15},
-  {name:'Dungeon Delve',  minP:10,t:240,rew:{iron:25,gold:40},xp:45,danger:.2},
-  {name:'Ancient Vault',  minP:20,t:360,rew:{gold:100,mana:20,iron:30},xp:80,danger:.3},
-  {name:'Dragon Scouting',minP:30,t:480,rew:{gold:150,mana:40},xp:120,danger:.4},
+  {name:'Border Skirmish',minP:5, t:60, rew:{gold:30,iron:10},  xp:20, danger:.1,  desc:'Drive off raiders from the northern pass.'},
+  {name:'Forest Hunt',    minP:8, t:90, rew:{food:50,wood:30},  xp:35, danger:.15, desc:'Hunt the beasts plaguing eastern villages.'},
+  {name:'Dungeon Delve',  minP:10,t:150,rew:{iron:25,gold:40},  xp:45, danger:.2,  desc:'Descend into the ruins beneath Harrowmere.'},
+  {name:'Ancient Vault',  minP:20,t:240,rew:{gold:100,mana:20,iron:30},xp:80,danger:.3,desc:'Seek treasures of the Old Kingdom.'},
+  {name:'Dragon Scouting',minP:30,t:360,rew:{gold:150,mana:40}, xp:120,danger:.4,  desc:'Observe the wyvern nesting near the Ashpeaks.'},
+  {name:'Siege of Morrath',minP:50,t:480,rew:{gold:250,iron:80,mana:30},xp:200,danger:.5,desc:'Storm the ruined fortress of Morrath.'},
 ];
 const MAP_DEF=[
   {icon:'🏰',lbl:'Citadel',built:true},{icon:'⚔',lbl:'Barracks',id:'barracks'},
@@ -1753,11 +1817,15 @@ function gameTick(){
     G.resources.mana.amount-=10;G.resources.gold.amount=Math.min(G.resources.gold.max,G.resources.gold.amount+50);
     addLog('Alchemy transmutes 10 mana → 50 gold. ✨');
   }
-  if(G.prestigeRate>0&&G.tick%60===0){
-    const rate=G.prestigeRate*(1+(G.victoryBonus/100));
-    G.prestige=Math.min(G.prestigeGoal,G.prestige+rate);
-    G.prestigePoints=Math.min(9999,G.prestigePoints+Math.floor(rate/10));
+  // Passive prestige trickle — 1 point per minute from start
+  if(G.tick%60===0){
+    const rate=1+(G.prestigeRate>0?G.prestigeRate*(1+(G.victoryBonus/100)):0);
+    G.prestige=Math.min(G.prestigeGoal, G.prestige+rate);
+    G.prestigePoints=Math.min(9999, G.prestigePoints+Math.floor(rate/5));
   }
+  // Secondary iron from quarry — 0.2/min per mine level
+  const mineLvl=blvl('mine');
+  if(mineLvl>0&&G.tick%60===0) G.resources.iron.amount=Math.min(G.resources.iron.max, G.resources.iron.amount+(mineLvl*0.2));
   if(G.tick%300===0){G.year++;addLog(`Year ${G.year} of the ${G.era}. The kingdom endures.`);}
   if(G.activeResearch){
     const resBonus=G.legacyRelics.includes('relic_research')?0.9:1;
@@ -2171,7 +2239,9 @@ function renderResearch(){
       return `<span style="font-size:11px;color:${ok?'var(--parchment-dark)':'var(--blood-light)'}">${G.resources[r]?.icon||r}${a}</span>`;
     }).join(' ');
     const canQ2=citLvl>=3&&!done&&!locked&&!G.activeResearch2&&G.activeResearch!==rDef.id;
-    return`<div class="ritem ${done?'rcompleted':''} ${locked?'rlocked':''} ${isAct||isAct2?'ractive':''}">
+    return`<div class="ritem ${done?'rcompleted':''} ${locked?'rlocked':''} ${isAct||isAct2?'ractive':''}"
+      onclick="${!done&&!locked&&!G.activeResearch?`startResearch('${rDef.id}')`:''}"
+      style="cursor:${!done&&!locked&&!G.activeResearch?'pointer':'default'}">
       <div class="rname" style="display:flex;justify-content:space-between;align-items:center">
         <span>${done?'✓ ':''}${rDef.name}</span>
         ${canQ2?`<button onclick="startResearch2('${rDef.id}')" style="font-size:8px;padding:2px 5px;background:rgba(74,122,50,.15);border:1px solid rgba(74,122,50,.3);border-radius:2px;color:var(--forest-light);cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.5px;touch-action:manipulation">+Q2</button>`:''}

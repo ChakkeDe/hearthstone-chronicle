@@ -1,16 +1,16 @@
-const CACHE = 'hc-v10';
+const CACHE = 'hc-v12';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  'https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap'
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(c => c.addAll(ASSETS).catch(() => {}))
   );
-  // Don't skip waiting automatically — wait for user confirmation
+  // Take over immediately
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
@@ -23,14 +23,35 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // Network-first strategy for HTML and JS — always try network first
+  // Only fall back to cache if truly offline
+  if(e.request.url.includes('.html') || e.request.url.includes('.js') || e.request.url.endsWith('/')){
+    e.respondWith(
+      fetch(e.request)
+        .then(response => {
+          // Update cache with fresh version
+          const clone = response.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+          return response;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+  // Cache-first for images and other assets (they don't change often)
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => cached))
+    caches.match(e.request).then(cached => {
+      if(cached) return cached;
+      return fetch(e.request).then(response => {
+        const clone = response.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return response;
+      });
+    })
   );
 });
 
-// Listen for skip waiting message from the app
+// Listen for skip waiting message
 self.addEventListener('message', e => {
-  if(e.data && e.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
+  if(e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
