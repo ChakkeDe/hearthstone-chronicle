@@ -99,9 +99,19 @@ function relicLabel(id){
   return {relic_gold:'ðŸª™ Merchant\'s Seal',relic_combat:'âš” Sword of Ages',relic_research:'ðŸ“š Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '0.9.0';
-const CACHE_VERSION = 'hc-v30';
+const APP_VERSION = '0.9.1';
+const CACHE_VERSION = 'hc-v31';
 const RELIC_STACK_CAP = 5;
+
+const VILLAGE_FOCUS={
+  balanced:{label:'Balanced',desc:'Keep tribute steady across all outputs.'},
+  gold:{label:'Treasury',desc:'Push more coin from this village treasury.'},
+  food:{label:'Granary',desc:'Turn the village toward food tribute.'},
+  wood:{label:'Lumber',desc:'Focus the village on timber output.'},
+  stone:{label:'Masonry',desc:'Direct workers toward stone tribute.'},
+  iron:{label:'Foundry',desc:'Drive more iron from local forges.'},
+  mana:{label:'Sanctum',desc:'Draw out arcane remnants and mana tribute.'},
+};
 
 // â”€â”€ UPDATE CHECKER â”€â”€
 let _updateReloading=false;
@@ -718,7 +728,7 @@ function farmLootTotal(farm){
 
 function getVillageState(farmId){
   if(!G.governedVillages[farmId]){
-    G.governedVillages[farmId]={control:0,victories:0,governed:false};
+    G.governedVillages[farmId]={control:0,victories:0,governed:false,focus:'balanced'};
   }
   return G.governedVillages[farmId];
 }
@@ -735,10 +745,28 @@ function villageTributeMultiplier(){
   return 1+(G.dynasty*0.05)+(G.victoryPath==='diplomatic'?0.15:0);
 }
 
+function villageFocusOptions(farm){
+  return ['balanced',...Object.keys(farm.tribute||{})];
+}
+
+function villageFocusLabel(id){
+  return VILLAGE_FOCUS[id]?.label||id;
+}
+
+function villageFocusDesc(id){
+  return VILLAGE_FOCUS[id]?.desc||'';
+}
+
 function villageTributePerMinute(farm){
   const tribute={};
+  const state=getVillageState(farm.id);
+  const focus=state.focus||'balanced';
   Object.entries(farm.tribute||{}).forEach(([key,val])=>{
-    tribute[key]=val*villageTributeMultiplier();
+    let focusMult=1;
+    if(focus!=='balanced'){
+      focusMult=focus===key?1.8:0.7;
+    }
+    tribute[key]=val*villageTributeMultiplier()*focusMult;
   });
   return tribute;
 }
@@ -799,8 +827,22 @@ function governVillage(farmId){
   if((state.control||0)<(farm.controlNeed||100)){showSnot('Win more raids to establish control');return;}
   if(governedVillageCount()>=currentAdminCap()){showSnot('Increase administration capacity first');return;}
   state.governed=true;
+  state.focus=state.focus||'balanced';
   addLog(`${farm.name} now sends tribute to ${G.kingdomName}.`,'important');
   showOverlay(`${farm.name}\nNow governed. Tribute begins to flow each minute.`,'success','Village Governed');
+  renderAll();
+  saveGame();
+}
+
+function setVillageFocus(farmId, focus){
+  const farm=G.npcFarms.find(f=>f.id===farmId);
+  if(!farm)return;
+  const state=getVillageState(farmId);
+  if(!state.governed){showSnot('Govern the village first');return;}
+  if(!villageFocusOptions(farm).includes(focus)){showSnot('That focus is not available here');return;}
+  if(state.focus===focus)return;
+  state.focus=focus;
+  addLog(`${farm.name} now follows a ${villageFocusLabel(focus)} focus.`,'important');
   renderAll();
   saveGame();
 }
@@ -1044,7 +1086,7 @@ function renderCombat(){
       </div>
       <div class="npc-loot">Loot: ${lootStr}</div>
       <div style="font-size:10px;color:${state.governed?'var(--forest-light)':'var(--stone-light)'};margin-bottom:6px">
-        ${state.governed?`Governed · Tribute ${villageTributeString(farm)}`:`Control ${Math.floor(state.control||0)}/${controlNeed} · ${state.victories||0} victories`}
+        ${state.governed?`Governed · ${villageFocusLabel(state.focus||'balanced')} focus · Tribute ${villageTributeString(farm)}`:`Control ${Math.floor(state.control||0)}/${controlNeed} · ${state.victories||0} victories`}
       </div>
       <div class="raid-progress" style="margin-bottom:6px"><div class="raid-progress-inner" style="width:${controlPct}%;background:${state.governed?'linear-gradient(90deg,var(--forest-light),var(--gold))':'linear-gradient(90deg,var(--blood-light),var(--gold))'}"></div></div>
       <div class="npc-power-row">
@@ -1929,6 +1971,23 @@ function renderFaction(){
   const weeksLeft=SEASON_WEEKS-G.seasonWeek;
   const tribute=totalVillageTributePerMinute();
   const governed=G.npcFarms.filter(f=>getVillageState(f.id).governed);
+  const villageCards=governed.length?governed.map(farm=>{
+    const state=getVillageState(farm.id);
+    const options=villageFocusOptions(farm);
+    return `<div class="village-card">
+      <div class="village-card-top">
+        <div>
+          <div class="village-card-name">${farm.icon} ${farm.name}</div>
+          <div class="village-card-meta">${villageFocusLabel(state.focus||'balanced')} focus · ${villageTributeString(farm)}</div>
+        </div>
+        <div class="village-card-level">Lv ${farm.level}</div>
+      </div>
+      <div class="village-card-desc">${villageFocusDesc(state.focus||'balanced')}</div>
+      <div class="village-focus-row">
+        ${options.map(option=>`<button class="village-focus-btn ${state.focus===option?'active':''}" onclick="setVillageFocus('${farm.id}','${option}')">${villageFocusLabel(option)}</button>`).join('')}
+      </div>
+    </div>`;
+  }).join(''):'';
 
   tab.innerHTML=`
     <div class="section">
@@ -1943,6 +2002,7 @@ function renderFaction(){
       <div class="ftrait"><div class="ftrait-name">Administration</div><div class="ftrait-desc">${governedVillageCount()} / ${currentAdminCap()} governed villages. Base capacity ${G.adminCap}, Citadel adds ${Math.floor(blvl('citadel')/2)}.</div></div>
       <div class="ftrait"><div class="ftrait-name">Tribute Flow</div><div class="ftrait-desc">${Object.keys(tribute).length?Object.entries(tribute).map(([k,v])=>`${G.resources[k]?.icon||k}${v.toFixed(1)}/m`).join(' · '):'No villages are paying tribute yet.'}</div></div>
       <div class="ftrait"><div class="ftrait-name">Governed Villages</div><div class="ftrait-desc">${governed.length?governed.map(f=>`${f.icon} ${f.name}`).join(' · '):'None yet. Win repeated raids to fill control, then crown the village from Combat.'}</div></div>
+      ${governed.length?`<div class="village-card-list">${villageCards}</div>`:''}
     </div>
 
     <div class="section">
