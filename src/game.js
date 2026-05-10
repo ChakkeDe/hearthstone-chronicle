@@ -1,4 +1,4 @@
-﻿const G={
+const G={
   year:1,era:'First Age',tick:0,
   prestige:0,prestigeGoal:1000,prestigeRate:0,
   prestigePoints:0,          // spendable prestige currency
@@ -100,8 +100,8 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '0.9.3';
-const CACHE_VERSION = 'hc-v33';
+const APP_VERSION = '0.9.4';
+const CACHE_VERSION = 'hc-v34';
 const RELIC_STACK_CAP = 5;
 
 const VILLAGE_FOCUS={
@@ -119,6 +119,8 @@ const GOVERNOR_TRAITS={
   warden:{label:'Warden',desc:'+40 wall defence while this village is governed.'},
   quartermaster:{label:'Quartermaster',desc:'+10% loot capacity on raids after this village joins your realm.'},
 };
+
+const HERO_LEVEL_CAP = 20;
 
 // â”€â”€ UPDATE CHECKER â”€â”€
 let _updateReloading=false;
@@ -1666,7 +1668,7 @@ function spawnHero(){
   const avail=HERO_NAMES.filter(n=>!used.includes(n));
   if(!avail.length)return;
   const name=avail[0],cls=HERO_CLS[G.heroes.length%HERO_CLS.length];
-  G.heroes.push({name,cls,level:1,xp:0,xpGoal:100,power:5+G.heroes.length*2,hp:100,maxHp:100,onQuest:false,qt:0,qname:'',qDef:null,_ret:false});
+  G.heroes.push({name,cls,level:1,xp:0,xpGoal:100,power:5+G.heroes.length*2,hp:100,maxHp:100,onQuest:false,qt:0,qname:'',qDef:null,_ret:false,autoQuest:false});
   addLog(`${name} the ${cls} joins your banner!`,'important');
   showOverlay(`${name} the ${cls} is ready.`,'success','Hero Arrived');
   setBadge('heroes',G.activeTab!=='heroes');
@@ -1679,6 +1681,31 @@ function sendOnQuest(i){
   let t=q.t;if(G.questTimeMulti)t=Math.round(t*G.questTimeMulti);
   h.onQuest=true;h.qt=t;h.qname=q.name;h.qDef=q;h._ret=false;
   addLog(`${h.name} departs for: ${q.name}. Reward: ${questRewardText(q)}. ~${Math.round(t/60)} min.`);
+  renderHeroes();
+}
+
+function sendHeroOnBestQuest(h){
+  if(!h||h.onQuest||h.level>=HERO_LEVEL_CAP)return false;
+  const avail=QUESTS.filter(q=>h.power>=q.minP);
+  if(!avail.length)return false;
+  const q=avail[avail.length-1];
+  let t=q.t;if(G.questTimeMulti)t=Math.round(t*G.questTimeMulti);
+  h.onQuest=true;h.qt=t;h.qname=q.name;h.qDef=q;h._ret=false;
+  addLog(`${h.name} automatically departs for: ${q.name}. Reward: ${questRewardText(q)}. ~${Math.round(t/60)} min.`);
+  return true;
+}
+
+function toggleHeroAutoQuest(i){
+  const h=G.heroes[i];
+  if(!h)return;
+  h.autoQuest=!h.autoQuest;
+  if(h.autoQuest&&h.level>=HERO_LEVEL_CAP){
+    h.autoQuest=false;
+    showSnot(`${h.name} has reached the hero level cap`);
+    return;
+  }
+  addLog(`${h.name} auto-quest ${h.autoQuest?'enabled':'disabled'}.`);
+  if(h.autoQuest&&!h.onQuest) sendHeroOnBestQuest(h);
   renderHeroes();
 }
 
@@ -1698,16 +1725,24 @@ function completeQuest(h){
   Object.entries(q.rew).forEach(([res,amt])=>{if(G.resources[res])G.resources[res].amount=Math.min(G.resources[res].max,G.resources[res].amount+amt);});
   const rewardText=questRewardText(q);
   h.xp+=q.xp;
-  if(h.xp>=h.xpGoal){
+  if(h.xp>=h.xpGoal&&h.level<HERO_LEVEL_CAP){
     h.level++;h.xp-=h.xpGoal;h.xpGoal=Math.round(h.xpGoal*1.5);h.power=Math.round(h.power*1.15);
     addLog(`${h.name} reached level ${h.level}! Power: ${h.power}`,'important');
     showOverlay(`${h.name} reached Level ${h.level}!\nPower now: ${h.power}`,'success','Level Up!');
+  }else if(h.level>=HERO_LEVEL_CAP){
+    h.xp=Math.min(h.xp,h.xpGoal);
   }
   h.onQuest=false;h.qt=0;h.qname='';h._ret=true;
   G.prestige+=15;
   addLog(`${h.name} returns from ${q.name}. Rewards: ${rewardText}.`);
   showOverlay(`${rewardText}\n+15 prestige`,'success','Quest Rewards');
   setBadge('heroes',G.activeTab!=='heroes');
+  if(h.level>=HERO_LEVEL_CAP&&h.autoQuest){
+    h.autoQuest=false;
+    addLog(`${h.name} reached the hero level cap and stops auto-questing.`,'important');
+  }else if(h.autoQuest){
+    sendHeroOnBestQuest(h);
+  }
   renderAll();
 }
 
@@ -2042,9 +2077,10 @@ function renderHeroes(){
     const bestQuest=avail[avail.length-1];
     let status='Resting in the keep',sc='';
     if(h.onQuest){const m=Math.ceil(h.qt/60);status=`On quest: ${h.qname} (~${m}m)`;sc='onq';}
+    else if(h.level>=HERO_LEVEL_CAP){status=`At level cap (${HERO_LEVEL_CAP})`;sc='ret';}
     return`<div class="hcard">
       <div class="hname">⚔ ${h.name}</div>
-      <div class="hclass">${h.cls} · Level ${h.level}</div>
+      <div class="hclass">${h.cls} · Level ${h.level}/${HERO_LEVEL_CAP}</div>
       <div class="hstats">
         <div class="hstat"><div class="hstat-v">${h.power}</div><div class="hstat-l">Power</div></div>
         <div class="hstat"><div class="hstat-v">${h.hp}</div><div class="hstat-l">HP</div></div>
@@ -2054,9 +2090,14 @@ function renderHeroes(){
       <div class="hxp"><div class="hxp-i" style="width:${xpP}%"></div></div>
       <div class="hstatus ${sc}">${status}</div>
       ${bestQuest&&!h.onQuest?`<div style="font-size:10px;color:var(--stone-light);font-style:italic;margin-bottom:5px">Possible reward: ${questRewardText(bestQuest)}</div>`:''}
-      <button class="qbtn ${h.onQuest?'ret':''}" onclick="${h.onQuest?'':(`sendOnQuest(${i})`)}" ${h.onQuest||!avail.length?'disabled':''}>
-        ${h.onQuest?'⏳ On Quest':(avail.length?`⚔ Send on Quest (${avail.length} available)`:'⚠ Too Weak')}
-      </button>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button class="qbtn ${h.onQuest?'ret':''}" onclick="${h.onQuest?'':(`sendOnQuest(${i})`)}" ${h.onQuest||!avail.length||h.level>=HERO_LEVEL_CAP?'disabled':''} style="flex:1">
+          ${h.onQuest?'⏳ On Quest':(avail.length?`⚔ Send on Quest (${avail.length} available)`:'⚠ Too Weak')}
+        </button>
+        <button class="qbtn ${h.autoQuest?'ret':''}" onclick="toggleHeroAutoQuest(${i})" ${h.level>=HERO_LEVEL_CAP?'disabled':''} style="flex:0 0 auto;padding-inline:10px">
+          ${h.autoQuest?'↻ Auto':'Auto'}
+        </button>
+      </div>
     </div>`;
   }).join('');
 }
