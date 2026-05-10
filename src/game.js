@@ -1091,6 +1091,7 @@ function init(){
   setTimeout(attachTabTouch, 100); // fallback if DOMContentLoaded already fired
 
   renderAll();
+  attachResourceCardClicks();
   setInterval(gameTick,1000);
   setInterval(renderAll,3000);
   setInterval(saveGame,30000);
@@ -1368,7 +1369,7 @@ function renderResources(){
       const capColor=pct>=95?'var(--blood-light)':pct>=75?'#e8a020':'var(--forest-light)';
       const nearCap=pct>=95;
       const gain=effectiveResourceRate(k);
-      return`<div class="rc" onclick="showResourceStorageTimes()" title="Storage time" style="${nearCap?'border-color:rgba(192,57,43,.4);':''}">
+      return`<div class="rc" data-resource-card="${k}" role="button" tabindex="0" title="Storage time" style="${nearCap?'border-color:rgba(192,57,43,.4);':''}">
         <div class="rc-top"><div class="rc-icon">${r.icon}</div><div class="rc-name">${r.name}</div></div>
         <div class="rc-amount">${Math.floor(r.amount)}</div>
         <div class="rc-rate ${gain<0?'neg':''}">${gain>0?'+':''}${gain.toFixed(1)}/min</div>
@@ -1378,6 +1379,18 @@ function renderResources(){
         </div>
       </div>`;
     }).join('');
+}
+
+function attachResourceCardClicks(){
+  const el=document.getElementById('resource-grid');if(!el||el._resourceClicksAttached)return;
+  el._resourceClicksAttached=true;
+  el.addEventListener('click',e=>{
+    if(e.target.closest('[data-resource-card]'))showResourceStorageTimes();
+  });
+  el.addEventListener('keydown',e=>{
+    if(!e.target.closest('[data-resource-card]'))return;
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();showResourceStorageTimes();}
+  });
 }
 
 function effectiveResourceRate(key){
@@ -1406,7 +1419,7 @@ function resourceCapLine(key,r){
 
 function showResourceStorageTimes(){
   const lines=Object.entries(G.resources).map(([k,r])=>resourceCapLine(k,r));
-  showSnot(lines.join('\n'),5200);
+  showOverlay(lines.join('\n'),'success','Storage Forecast');
 }
 
 function renderBuildings(){
