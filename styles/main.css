@@ -412,6 +412,23 @@ body::before{content:'';position:fixed;inset:0;
 .toggle-label{font-size:11px;color:var(--stone-light);}
 .threshold-row{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;color:var(--stone-light);}
 
+.village-card-list{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
+.village-card{background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.14);border-radius:4px;padding:10px;}
+.village-card-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:6px;}
+.village-card-name{font-family:'Cinzel',serif;font-size:12px;color:var(--parchment);}
+.village-card-meta{font-size:11px;color:var(--gold-dark);line-height:1.4;}
+.village-card-level{font-size:10px;color:var(--gold);background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);border-radius:3px;padding:2px 6px;font-family:'Cinzel',serif;white-space:nowrap;}
+.village-card-desc{font-size:11px;color:var(--stone-light);font-style:italic;line-height:1.4;margin-bottom:8px;}
+.village-focus-row{display:flex;flex-wrap:wrap;gap:6px;}
+.village-focus-btn{padding:5px 8px;background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.15);border-radius:3px;color:var(--stone-light);font-family:'Cinzel',serif;font-size:9px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s;}
+.village-focus-btn.active{background:rgba(201,168,76,.14);border-color:var(--gold-dark);color:var(--gold);}
+.report-card{background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.12);border-radius:4px;padding:8px;margin-bottom:6px;}
+.report-card.victory{border-color:rgba(74,122,50,.28);}
+.report-card.defeat{border-color:rgba(139,26,26,.3);}
+.report-top{display:flex;justify-content:space-between;align-items:center;font-family:'Cinzel',serif;font-size:11px;color:var(--parchment);margin-bottom:4px;}
+.report-grade{color:var(--gold);font-size:12px;}
+.report-meta{font-size:10px;color:var(--stone-light);line-height:1.35;}
+
 /* STORAGE BUILDINGS indicator */
 .storage-info{font-size:10px;color:var(--gold-dark);font-style:italic;margin-top:2px;}
 
