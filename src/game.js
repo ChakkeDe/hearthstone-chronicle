@@ -96,8 +96,8 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '0.7.9';
-const CACHE_VERSION = 'hc-v28';
+const APP_VERSION = '0.8.0';
+const CACHE_VERSION = 'hc-v29';
 const RELIC_STACK_CAP = 5;
 
 // ── UPDATE CHECKER ──
@@ -716,6 +716,43 @@ function calcLootCapacity(sent){
   },0);
 }
 
+function farmLootTotal(farm){
+  return Object.values(farm.loot||{}).reduce((sum,val)=>sum+val,0);
+}
+
+function planRaidTroops(farm){
+  const sent={infantry:0,archers:0,cavalry:0,siege:0};
+  let power=0, carry=0;
+  const targetPower=farm.def||0;
+  const targetCarry=farmLootTotal(farm);
+
+  // Prefer fast, high-capacity troops first so auto-farm can spread raids efficiently.
+  ['cavalry','infantry','archers'].forEach(type=>{
+    const def=TROOP_DEF[type];
+    const avail=G.troops[type]?.available||0;
+    if(!def||avail<=0)return;
+    if(power>=targetPower&&carry>=targetCarry)return;
+    const powerNeed=Math.max(0,targetPower-power);
+    const carryNeed=Math.max(0,targetCarry-carry);
+    const qtyForPower=powerNeed>0?Math.ceil(powerNeed/def.atk):0;
+    const qtyForCarry=carryNeed>0?Math.ceil(carryNeed/def.carry):0;
+    const qty=Math.min(avail,Math.max(qtyForPower,qtyForCarry));
+    sent[type]=qty;
+    power+=qty*def.atk;
+    carry+=qty*def.carry;
+  });
+
+  return {
+    sent,
+    power,
+    carry,
+    targetPower,
+    targetCarry,
+    canBeat:power>=targetPower,
+    canLootAll:carry>=targetCarry,
+  };
+}
+
 function attackNPC(farmId,sent){
   const farm=G.npcFarms.find(f=>f.id===farmId);
   if(!farm||!farm.available){showSnot('Target not available');return;}
@@ -1117,15 +1154,8 @@ function checkAutoFarm(){
       return;
     }
 
-    // Send available non-siege troops
-    const sent={infantry:0,archers:0,cavalry:0,siege:0};
-    let power=0;
-    ['cavalry','archers','infantry'].forEach(type=>{
-      if(power>=farm.def)return;
-      const qty=Math.min(G.troops[type].available,Math.ceil((farm.def-power)/TROOP_DEF[type].atk));
-      sent[type]=qty;power+=qty*TROOP_DEF[type].atk;
-    });
-    if(power>=farm.def) attackNPC(farm.id,sent);
+    const raidPlan=planRaidTroops(farm);
+    if(raidPlan.canBeat) attackNPC(farm.id,raidPlan.sent);
   });
 }
 
