@@ -15,7 +15,7 @@ const G={
     food: {amount:200, rate:3,  max:500, icon:'🌾',name:'Food'},
     wood: {amount:180, rate:3,  max:500, icon:'🪵',name:'Wood'},
     stone:{amount:120, rate:2,  max:500, icon:'⚙', name:'Stone'},
-    iron: {amount:10, rate:0.5,max:300,icon:'⛏', name:'Iron'},
+    iron: {amount:15, rate:1,  max:300,icon:'⛏', name:'Iron'},
     mana: {amount:0, rate:0,max:200,icon:'✨',name:'Mana'},
   },
   buildings:[],research:{},heroes:[],
@@ -534,9 +534,9 @@ function applyLoadedState(s){
   G.log=s.log||G.log;
 }
 
-// Cost helper — cheap early levels, steep later. Base * 1.8^(level-1)
+// Cost helper — cheap early levels, steeper later. Base * 1.65^(level-1)
 function bCost(base, l){
-  return Math.round(base * Math.pow(1.8, l-1));
+  return Math.round(base * Math.pow(1.65, l-1));
 }
 
 function initCombat(){
