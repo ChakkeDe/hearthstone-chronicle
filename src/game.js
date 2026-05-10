@@ -74,6 +74,10 @@ function earlyBoost(){
   return Math.max(1, 5-(t*0.16));
 }
 
+function researchSpeedMultiplier(){
+  return G.legacyRelics.includes('relic_research') ? (1/0.9) : 1;
+}
+
 const APP_VERSION = '0.7.0';
 
 // ── UPDATE CHECKER ──
@@ -211,14 +215,14 @@ async function applyOfflineProgress(){
 
   // Research queue 1
   if(G.activeResearch){
-    G.researchProgress=Math.min(G.researchProgress+ticks,99999);
+    G.researchProgress=Math.min(G.researchProgress+(ticks*researchSpeedMultiplier()),99999);
     const rDef=allR().find(r=>r.id===G.activeResearch);
     if(rDef&&G.researchProgress>=rDef.time) completeResearch(rDef);
   }
 
   // Research queue 2
   if(G.activeResearch2){
-    G.researchProgress2=Math.min(G.researchProgress2+ticks,99999);
+    G.researchProgress2=Math.min(G.researchProgress2+(ticks*researchSpeedMultiplier()),99999);
     const rDef2=allR().find(r=>r.id===G.activeResearch2);
     if(rDef2&&G.researchProgress2>=rDef2.time){
       G.research[rDef2.id].completed=true;
@@ -279,17 +283,6 @@ async function applyOfflineProgress(){
 }
 
 // ── VICTORY PATHS ──
-const VICTORY_PATHS={
-  military:{label:'Military Dominance',icon:'⚔',desc:'Win through conquest. Research all military branches.',bonus:40,
-    check:()=>['swordsmanship','fortification','cavalry','siegecraft'].every(id=>G.research[id]?.completed)},
-  economic:{label:'Economic Supremacy',icon:'⚖',desc:'Amass wealth. Complete all economy research.',bonus:40,
-    check:()=>['trade_routes','crop_rotation','stonemasons','banking'].every(id=>G.research[id]?.completed)},
-  diplomatic:{label:'Diplomatic Legacy',icon:'🤝',desc:'Men of the West unique. Complete all diplomacy research.',bonus:40,
-    check:()=>['envoys','treaties','trade_alliance','high_council'].every(id=>G.research[id]?.completed)},
-  research:{label:'Arcane Mastery',icon:'✨',desc:'Master the arcane. Complete all arcane research.',bonus:40,
-    check:()=>['runic_script','warding','alchemy','farseeing'].every(id=>G.research[id]?.completed)},
-};
-
 function checkVictoryPath(){
   Object.entries(VICTORY_PATHS).forEach(([key,path])=>{
     if(path.check()){
@@ -305,21 +298,6 @@ function checkVictoryPath(){
 }
 
 // ── PRESTIGE SPENDING ──
-const PRESTIGE_ABILITIES=[
-  {id:'vassal_tribute',name:'Call for Tribute',icon:'👑',cost:50,desc:'Demand tribute from vassal lords. +200 gold instantly.',
-   cooldown:300,lastUsed:0,
-   use:()=>{G.resources.gold.amount=Math.min(G.resources.gold.max,G.resources.gold.amount+200);addLog('Vassal lords deliver tribute. +200 gold.','important');}},
-  {id:'rally_workers',name:'Rally the People',icon:'🔔',cost:80,desc:'Inspire workers. 2× all resource income for 2 minutes.',
-   cooldown:600,lastUsed:0,
-   use:()=>{G._rallied=true;G._rallyEnd=G.tick+120;addLog('The people rally to your banner! 2× income for 2 minutes.','important');}},
-  {id:'royal_decree',name:'Royal Decree',icon:'📜',cost:120,desc:'Issue a decree. Instantly complete current research.',
-   cooldown:1800,lastUsed:0,
-   use:()=>{if(!G.activeResearch){showSnot('No research active');return;}const rDef=allR().find(r=>r.id===G.activeResearch);if(rDef)completeResearch(rDef);addLog('A Royal Decree accelerates all scholarly work.','important');}},
-  {id:'diplomatic_mission',name:'Diplomatic Mission',icon:'🤝',cost:150,desc:'Send envoys abroad. Unlock Diplomacy research tab early.',
-   cooldown:3600,lastUsed:0,
-   use:()=>{unlockTab('diplomacy');revealR(['envoys']);addLog('Royal envoys depart for distant kingdoms.','important');}},
-];
-
 function spendPrestige(ability){
   if(G.prestigePoints<ability.cost){showSnot('Not enough prestige points');return;}
   if(G.tick-ability.lastUsed<ability.cooldown){
@@ -334,8 +312,6 @@ function spendPrestige(ability){
 }
 
 // ── SEASON STRUCTURE ──
-const SEASON_WEEKS=6;
-const TICKS_PER_WEEK=300; // 5 real minutes per in-game week for prototype (would be 7 days in production)
 
 function seasonTick(){
   G.seasonTick++;
@@ -562,135 +538,6 @@ function applyLoadedState(s){
 function bCost(base, l){
   return Math.round(base * Math.pow(1.8, l-1));
 }
-
-const BD=[
-  {id:'farm',  name:'Grain Farm',   icon:'🌾',max:10,tier:1,desc:'Fertile fields feed your growing kingdom.',
-   eff:l=>`+${l*3} food/min`,
-   cost:l=>({wood:bCost(8,l), stone:bCost(4,l)}),
-   onBuild:l=>{G.resources.food.rate+=3;},unlocks:['lumber','mine']},
-
-  {id:'lumber',name:'Lumber Mill',  icon:'🪵',max:10,tier:1,desc:'Axes ring through the ancient forest.',
-   eff:l=>`+${l*3} wood/min`,
-   cost:l=>({gold:bCost(6,l), stone:bCost(4,l)}),
-   onBuild:l=>{G.resources.wood.rate+=3;},unlocks:['mine','market']},
-
-  {id:'mine',  name:'Stone Quarry', icon:'⛰', max:10,tier:1,desc:'Chisels bite deep into the hillside.',
-   eff:l=>`+${l*3} stone/min`,
-   cost:l=>({wood:bCost(10,l), food:bCost(5,l)}),
-   onBuild:l=>{G.resources.stone.rate+=3;},unlocks:['market','ironworks']},
-
-  {id:'market',name:'Grand Market', icon:'⚖', max:8,tier:2,desc:'Merchants bring coin from distant lands.',
-   eff:l=>`+${l*5} gold/min`,
-   cost:l=>({wood:bCost(20,l), stone:bCost(12,l), food:bCost(8,l)}),
-   onBuild:l=>{G.resources.gold.rate+=5;},unlocks:['ironworks']},
-
-  {id:'ironworks',name:'Iron Foundry',icon:'🔥',max:8,tier:2,desc:'Fire and hammer shape the future of war.',
-   eff:l=>`+${l*4} iron/min`,
-   cost:l=>({stone:bCost(15,l), gold:bCost(12,l), wood:bCost(8,l)}),
-   onBuild:l=>{G.resources.iron.rate+=4;},
-   req:{mine:1},unlocks:['tower','barracks']},
-
-  {id:'tower', name:'Mage Tower',   icon:'🗼',max:6,tier:3,desc:'Ancient ley lines channel arcane power.',
-   eff:l=>`+${l*2} mana/min, +${l*5}% research speed`,
-   cost:l=>({stone:bCost(40,l), gold:bCost(30,l), iron:bCost(8,l)}),
-   onBuild:l=>{G.resources.mana.rate+=2;revealR(['runic_script']);unlockTab('arcane');},
-   req:{ironworks:1},unlocks:['citadel']},
-
-  {id:'barracks',name:"King's Barracks",icon:'⚔',max:8,tier:3,desc:'Soldiers train under the banner of the West.',
-   eff:l=>`+${l*10}% hero combat power`,
-   cost:l=>({wood:bCost(25,l), stone:bCost(18,l), iron:bCost(5,l)}),
-   onBuild:l=>{if(l===1)spawnHero();if(l===3)spawnHero();if(l===6)spawnHero();},
-   req:{ironworks:1},unlocks:['citadel']},
-
-  {id:'citadel',name:'Royal Citadel',icon:'🏰',max:5,tier:4,desc:'The seat of power. Expands caps, unlocks diplomacy and defence.',
-   eff:l=>`+${l*300} caps, +${l*25} prestige/min, +${l*50} wall defence`,
-   cost:l=>({gold:bCost(80,l),stone:bCost(60,l),iron:bCost(25,l),wood:bCost(40,l)}),
-   onBuild:l=>{
-     Object.values(G.resources).forEach(r=>r.max+=300);
-     G.prestigeRate=(G.prestigeRate||0)+25;
-     G.wallDefence=(G.wallDefence||0)+50;
-     G.warChestCap=(G.warChestCap||500)+200;
-     if(l>=2){G.watchtowerUnlocked=true;addLog('Watchtower unlocked!','important');}
-     if(l>=3){addLog('Second research queue unlocked!','important');}
-     revealR(['envoys']);unlockTab('diplomacy');},
-   req:{barracks:2,tower:1}},
-  {id:'hospital',name:'Field Hospital',icon:'🏥',max:6,tier:3,desc:'Treats wounded soldiers.',
-   eff:l=>`Recover up to ${100+l*100} troops`,
-   cost:l=>({wood:bCost(20,l),stone:bCost(15,l),food:bCost(10,l)}),
-   onBuild:l=>{G.hospital.capacity=100+l*100;},req:{barracks:1}},
-  {id:'granary',name:'Granary',icon:'🌾',max:6,tier:2,desc:'Vast grain stores feed your armies.',
-   eff:l=>`+${l*200} food cap`,cost:l=>({wood:bCost(12,l),stone:bCost(8,l)}),
-   onBuild:l=>{G.resources.food.max+=200;G.storageLevels.granary=l;},req:{farm:2}},
-  {id:'vault',name:'Royal Vault',icon:'🏦',max:6,tier:2,desc:'Secure vaults protect your treasury.',
-   eff:l=>`+${l*200} gold cap`,cost:l=>({stone:bCost(15,l),iron:bCost(8,l)}),
-   onBuild:l=>{G.resources.gold.max+=200;G.storageLevels.vault=l;},req:{market:2}},
-  {id:'timberyard',name:'Timber Yard',icon:'🪵',max:6,tier:2,desc:'Seasoned wood stockpiles.',
-   eff:l=>`+${l*200} wood cap`,cost:l=>({food:bCost(10,l),stone:bCost(6,l)}),
-   onBuild:l=>{G.resources.wood.max+=200;G.storageLevels.timberyard=l;},req:{lumber:2}},
-  {id:'armoury',name:'Armoury',icon:'🗡',max:6,tier:2,desc:'Iron stockpiles for weapons and armour.',
-   eff:l=>`+${l*150} iron cap`,cost:l=>({stone:bCost(18,l),wood:bCost(10,l)}),
-   onBuild:l=>{G.resources.iron.max+=150;G.storageLevels.armoury=l;},req:{ironworks:2}},
-];
-
-const RD={
-  economy:[
-    {id:'trade_routes',name:'Trade Routes',desc:'+25% gold income.',cost:{gold:80,wood:40},time:120,
-     eff:()=>{G.resources.gold.rate=Math.round(G.resources.gold.rate*1.25);},unlocks:['crop_rotation','stonemasons']},
-    {id:'crop_rotation',name:'Crop Rotation',desc:'+30% food income.',cost:{food:60,gold:40},time:150,
-     eff:()=>{G.resources.food.rate=Math.round(G.resources.food.rate*1.3);},req:'trade_routes',unlocks:['stonemasons']},
-    {id:'stonemasons',name:'Guild of Stonemasons',desc:'+50% stone income.',cost:{stone:80,gold:60},time:180,
-     eff:()=>{G.resources.stone.rate=Math.round(G.resources.stone.rate*1.5);},req:'trade_routes',unlocks:['banking']},
-    {id:'banking',name:'Royal Treasury',desc:'Gold cap doubled. +5 gold/min.',cost:{gold:200,iron:20},time:300,
-     eff:()=>{G.resources.gold.max*=2;G.resources.gold.rate+=5;},req:'stonemasons'},
-  ],
-  military:[
-    {id:'swordsmanship',name:'Swordsmanship',desc:'Heroes deal +20% damage.',cost:{iron:30,gold:50},time:120,
-     eff:()=>{G.heroes.forEach(h=>h.power=Math.round(h.power*1.2));},unlocks:['fortification','cavalry']},
-    {id:'fortification',name:'Fortifications',desc:'Border defence +40%.',cost:{stone:60,iron:20},time:150,
-     eff:()=>{G.fortBonus=(G.fortBonus||0)+40;},req:'swordsmanship',unlocks:['siegecraft']},
-    {id:'cavalry',name:'Order of Knights',desc:'Expedition time halved. Loot +25%.',cost:{iron:60,gold:80,food:40},time:240,
-     eff:()=>{G.questTimeMulti=0.5;},req:'swordsmanship'},
-    {id:'siegecraft',name:'Siege Engines',desc:'Unlocks conquest quests.',cost:{iron:100,stone:80,wood:60},time:360,
-     eff:()=>{G.hasSiege=true;},req:'fortification'},
-  ],
-  arcane:[
-    {id:'runic_script',name:'Runic Script',desc:'+1 mana/min from Mage Towers.',cost:{gold:60,wood:30},time:90,
-     eff:()=>{G.resources.mana.rate+=1;},unlocks:['warding','alchemy']},
-    {id:'warding',name:'Wards of Protection',desc:'Heroes survive fatal quests once.',cost:{mana:20,gold:60},time:180,
-     eff:()=>{G.wardProtect=true;},req:'runic_script',unlocks:['farseeing']},
-    {id:'alchemy',name:'Alchemical Arts',desc:'10 mana → 50 gold per minute.',cost:{mana:40,gold:80,iron:20},time:240,
-     eff:()=>{G.hasAlchemy=true;},req:'runic_script'},
-    {id:'farseeing',name:"The Palantír Art",desc:'Preview quest outcomes before committing.',cost:{mana:80,gold:100},time:300,
-     eff:()=>{G.hasFarsight=true;},req:'warding'},
-  ],
-  diplomacy:[
-    {id:'envoys',name:'Royal Envoys',desc:'+10 gold/min tribute from neutral lands.',cost:{gold:60,food:40},time:120,
-     eff:()=>{G.resources.gold.rate+=10;},unlocks:['treaties','trade_alliance']},
-    {id:'treaties',name:'Vassal Treaties',desc:'Men of the West unique. +20 prestige/min.',cost:{gold:120,food:60},time:200,
-     eff:()=>{G.prestigeRate=(G.prestigeRate||0)+20;},req:'envoys',unlocks:['high_council']},
-    {id:'trade_alliance',name:'Trade Alliance',desc:'Building costs reduced by 15%.',cost:{gold:150,iron:30},time:240,
-     eff:()=>{G.costReduction=0.85;},req:'envoys'},
-    {id:'high_council',name:'High Council of Kings',desc:'Establish dynastic dominance. +200 prestige.',cost:{gold:300,mana:50,iron:50},time:480,
-     eff:()=>{addLog('The High Council convenes. Your dynasty is legend.','important');G.prestige+=200;},req:'treaties'},
-  ],
-};
-
-// ── COMBAT DEFINITIONS ──
-const TROOP_DEF={
-  infantry:{name:'Infantry',icon:'🗡',atk:10,def:15,carry:20,speed:60, trainTime:8, cost:{food:10,iron:5},  reqBarracks:1,desc:'Sturdy front-line fighters. Strong defence.'},
-  archers: {name:'Archers', icon:'🏹',atk:14,def:8, carry:15,speed:90, trainTime:12,cost:{wood:15,iron:8},  reqBarracks:2,desc:'Ranged attackers. High loot efficiency.'},
-  cavalry: {name:'Cavalry', icon:'🐎',atk:20,def:12,carry:40,speed:45, trainTime:25,cost:{food:20,iron:15}, reqBarracks:3,desc:'Fast raiders. Best loot capacity.'},
-  siege:   {name:'Siege',   icon:'🏹',atk:35,def:5, carry:10,speed:120,trainTime:60,cost:{wood:40,iron:30},reqBarracks:4,desc:'Destroys walls. PvP only — no NPC use.'},
-};
-
-const NPC_FARMS=[
-  {id:'n1',name:'Peasant Village',icon:'🏘',level:1,def:20, loot:{gold:30,food:40,wood:20},respawn:300,available:true,respawnAt:0},
-  {id:'n2',name:'Abandoned Fort',  icon:'🏚',level:2,def:50, loot:{gold:60,iron:20,wood:30},respawn:480,available:true,respawnAt:0},
-  {id:'n3',name:'River Crossing',  icon:'🌊',level:2,def:40, loot:{food:80,wood:50},respawn:420,available:true,respawnAt:0},
-  {id:'n4',name:'Bandit Camp',     icon:'⛺',level:3,def:100,loot:{gold:100,iron:40},respawn:600,available:true,respawnAt:0},
-  {id:'n5',name:'Ancient Ruins',   icon:'🗺',level:4,def:200,loot:{gold:150,mana:20,iron:60},respawn:900,available:true,respawnAt:0},
-  {id:'n6',name:'Orc Stronghold',  icon:'🏯',level:5,def:400,loot:{gold:200,iron:100,food:80},respawn:1200,available:true,respawnAt:0},
-];
 
 function initCombat(){
   G.npcFarms=NPC_FARMS.map(f=>({...f}));
@@ -1013,26 +860,6 @@ function launchAttack(farmId){
   attackNPC(farmId,sent);
 }
 
-const HERO_NAMES=['Aldric the Bold','Seraphina Dawnblade','Torren Ironfist','Lyra Swiftarrow','Caelen of the Vale'];
-const HERO_CLS=['Knight','Ranger','Mage','Warrior','Scout'];
-const QUESTS=[
-  {name:'Border Skirmish',minP:5, t:60, rew:{gold:30,iron:10},  xp:20, danger:.1,  desc:'Drive off raiders from the northern pass.'},
-  {name:'Forest Hunt',    minP:8, t:90, rew:{food:50,wood:30},  xp:35, danger:.15, desc:'Hunt the beasts plaguing eastern villages.'},
-  {name:'Dungeon Delve',  minP:10,t:150,rew:{iron:25,gold:40},  xp:45, danger:.2,  desc:'Descend into the ruins beneath Harrowmere.'},
-  {name:'Ancient Vault',  minP:20,t:240,rew:{gold:100,mana:20,iron:30},xp:80,danger:.3,desc:'Seek treasures of the Old Kingdom.'},
-  {name:'Dragon Scouting',minP:30,t:360,rew:{gold:150,mana:40}, xp:120,danger:.4,  desc:'Observe the wyvern nesting near the Ashpeaks.'},
-  {name:'Siege of Morrath',minP:50,t:480,rew:{gold:250,iron:80,mana:30},xp:200,danger:.5,desc:'Storm the ruined fortress of Morrath.'},
-];
-const MAP_DEF=[
-  {icon:'🏰',lbl:'Citadel',built:true},{icon:'⚔',lbl:'Barracks',id:'barracks'},
-  {icon:'🌾',lbl:'Farmlands',id:'farm'},{icon:'🪵',lbl:'Mill',id:'lumber'},
-  {icon:'⛰',lbl:'Quarry',id:'mine'},{icon:'⚖',lbl:'Market',id:'market'},
-  {icon:'🔥',lbl:'Foundry',id:'ironworks'},{icon:'🗼',lbl:'Tower',id:'tower'},
-  {icon:'🛤',lbl:'Roads'},{icon:'🌲',lbl:'Forest'},{icon:'🏔',lbl:'Highlands'},
-  {icon:'🌊',lbl:'River'},{icon:'⛺',lbl:'Outpost'},{icon:'🗺',lbl:'Ruins'},{icon:'🌅',lbl:'Borderlands'},
-];
-
-// ── RESEARCH HELPERS ──
 const allR=()=>[...RD.economy,...RD.military,...RD.arcane,...RD.diplomacy];
 
 // ── POWER LEVEL ──
@@ -1275,15 +1102,13 @@ function gameTick(){
   if(mineLvl>0&&G.tick%60===0) G.resources.iron.amount=Math.min(G.resources.iron.max, G.resources.iron.amount+(mineLvl*0.2));
   if(G.tick%300===0){G.year++;addLog(`Year ${G.year} of the ${G.era}. The kingdom endures.`);}
   if(G.activeResearch){
-    const resBonus=G.legacyRelics.includes('relic_research')?0.9:1;
-    G.researchProgress+=resBonus;
+    G.researchProgress+=researchSpeedMultiplier();
     const rDef=allR().find(r=>r.id===G.activeResearch);
     if(rDef&&G.researchProgress>=rDef.time)completeResearch(rDef);
   }
   // Second research queue
   if(G.activeResearch2){
-    const resBonus=G.legacyRelics.includes('relic_research')?0.9:1;
-    G.researchProgress2+=resBonus;
+    G.researchProgress2+=researchSpeedMultiplier();
     const rDef2=allR().find(r=>r.id===G.activeResearch2);
     if(rDef2&&G.researchProgress2>=rDef2.time){
       G.research[rDef2.id].completed=true;
@@ -1538,22 +1363,6 @@ function renderBuildings(){
 }
 
 // ── ISOMETRIC CITY VIEW ──
-const BASE_URL='https://chakkede.github.io/hearthstone-chronicle/assets/';
-
-// Tap zones mapped to the composite city.jpg image (% of image width/height)
-// Each zone is a clickable region over the matching building in the scene
-const CITY_ZONES=[
-  {id:'citadel',   label:'Citadel',    x:13, y:5,  w:24, h:30},
-  {id:'tower',     label:'Mage Tower', x:62, y:3,  w:20, h:28},
-  {id:'barracks',  label:'Barracks',   x:28, y:22, w:26, h:28},
-  {id:'farm',      label:'Farm',       x:1,  y:28, w:18, h:24},
-  {id:'lumber',    label:'Lumber',     x:68, y:27, w:22, h:24},
-  {id:'mine',      label:'Quarry',     x:7,  y:50, w:22, h:24},
-  {id:'market',    label:'Market',     x:62, y:54, w:26, h:24},
-  {id:'ironworks', label:'Foundry',    x:34, y:62, w:24, h:22},
-  {id:'hospital',  label:'Hospital',   x:40, y:42, w:22, h:22},
-];
-
 let _popupBuildingId=null;
 
 function renderMap(){
