@@ -1,8 +1,9 @@
-const CACHE = 'hc-v17';
+const CACHE = 'hc-v20';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './version.json',
   './styles/main.css',
   './src/pwa.js',
   './src/game.js',
@@ -18,8 +19,6 @@ self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(c => c.addAll(ASSETS).catch(() => {}))
   );
-  // Take over immediately
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
@@ -34,7 +33,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   // Network-first strategy for HTML and JS — always try network first
   // Only fall back to cache if truly offline
-  if(e.request.url.includes('.html') || e.request.url.includes('.js') || e.request.url.endsWith('/')){
+  if(e.request.url.includes('.html') || e.request.url.includes('.js') || e.request.url.includes('version.json') || e.request.url.endsWith('/')){
     e.respondWith(
       fetch(e.request)
         .then(response => {

@@ -78,11 +78,20 @@ function researchSpeedMultiplier(){
   return G.legacyRelics.includes('relic_research') ? (1/0.9) : 1;
 }
 
-const APP_VERSION = '0.7.0';
+const APP_VERSION = '0.7.1';
+const CACHE_VERSION = 'hc-v20';
 
 // ── UPDATE CHECKER ──
+let _updateReloading=false;
+
 function checkForUpdate(){
   if(!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(_updateReloading)return;
+    _updateReloading=true;
+    saveGame();
+    window.location.reload();
+  });
   navigator.serviceWorker.ready.then(reg=>{
     reg.addEventListener('updatefound',()=>{
       const newWorker=reg.installing;
@@ -94,9 +103,27 @@ function checkForUpdate(){
     });
     reg.update();
   });
+  fetchLatestVersion().then(latest=>{
+    if(latest&&latest.cache&&latest.cache!==CACHE_VERSION)showUpdateBanner(`New version available (${latest.cache})`);
+  });
+  updateVersionLabels();
 }
 
-function showUpdateBanner(){
+function updateVersionLabels(){
+  document.querySelectorAll('[data-version-label]').forEach(el=>{
+    el.textContent=`v${APP_VERSION} / ${CACHE_VERSION}`;
+  });
+}
+
+async function fetchLatestVersion(){
+  try{
+    const res=await fetch(`version.json?t=${Date.now()}`,{cache:'no-store'});
+    if(!res.ok)return null;
+    return await res.json();
+  }catch(e){return null;}
+}
+
+function showUpdateBanner(msg='New version available'){
   if(document.getElementById('update-banner'))return;
   const el=document.createElement('div');
   el.id='update-banner';
@@ -107,7 +134,7 @@ function showUpdateBanner(){
     font-family:'Cinzel',serif;font-size:12px;color:var(--gold-light);
     box-shadow:0 4px 20px rgba(0,0,0,.6);white-space:nowrap;`;
   el.innerHTML=`
-    <span>✦ New version available</span>
+    <span>✦ ${msg}</span>
     <button onclick="applyUpdate()" style="background:rgba(201,168,76,.2);border:1px solid var(--gold);
       border-radius:3px;padding:4px 10px;color:var(--gold);font-family:'Cinzel',serif;
       font-size:10px;letter-spacing:1px;cursor:pointer;touch-action:manipulation;">Update</button>
@@ -125,27 +152,56 @@ async function manualCheckForUpdate(){
   try{
     const reg=await navigator.serviceWorker.ready;
     await reg.update();
+    const latest=await fetchLatestVersion();
     if(reg.waiting){
       showUpdateBanner();
       showSnot('Update ready to install');
       return;
     }
-    showSnot(`You are running v${APP_VERSION}`);
+    if(latest&&latest.cache&&latest.cache!==CACHE_VERSION){
+      showUpdateBanner(`New version available (${latest.cache})`);
+      showSnot('Update ready to install');
+      return;
+    }
+    showSnot(`You are running v${APP_VERSION} / ${CACHE_VERSION}`);
   }catch(e){
     showSnot('Could not check for updates');
   }
 }
 
-function applyUpdate(){
-  navigator.serviceWorker.ready.then(reg=>{
+async function applyUpdate(){
+  saveGame();
+  if(!('serviceWorker' in navigator)){
+    forceReloadLatest();
+    return;
+  }
+  const reg=await navigator.serviceWorker.ready;
+  await reg.update();
+  if(reg.waiting){
+    _updateReloading=false;
     if(reg.waiting){
       reg.waiting.postMessage({type:'SKIP_WAITING'});
     }
-  });
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    saveGame();
-    window.location.reload();
-  });
+    return;
+  }
+  forceReloadLatest();
+}
+
+async function forceReloadLatest(){
+  saveGame();
+  try{
+    if('caches' in window){
+      const keys=await caches.keys();
+      await Promise.all(keys.map(k=>caches.delete(k)));
+    }
+    if('serviceWorker' in navigator){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r=>r.unregister()));
+    }
+  }catch(e){}
+  const url=new URL(window.location.href);
+  url.searchParams.set('fresh',Date.now());
+  window.location.replace(url.toString());
 }
 // Security model:
 // 1. If Supabase connected: use server's updated_at timestamp (unfakeable)
@@ -153,6 +209,8 @@ function applyUpdate(){
 // 3. If clock went backwards vs last known server time: skip offline progress entirely
 
 let _serverTimeOffset=0; // ms difference between server and local clock, calibrated on cloud load
+let _offlineReady=false;
+let _offlineApplying=false;
 
 async function fetchServerTime(){
   // Supabase exposes a lightweight endpoint we can use to get real server time
@@ -179,21 +237,24 @@ function getReliableNow(){
 }
 
 async function applyOfflineProgress(){
+  if(_offlineApplying)return false;
+  _offlineApplying=true;
   const reliableNow=getReliableNow();
 
-  // --- Tamper detection ---
-  // G.lastServerTime is the last real server timestamp we recorded
-  // If local clock is behind it, the clock was wound back — skip
-  if(G.lastServerTime&&reliableNow<G.lastServerTime-5000){
-    addLog('⚠ Time anomaly detected. Offline progress skipped.','danger');
-    showOverlay('Time anomaly detected.\nOffline progress skipped.','danger','Security Check');
-    G.lastSaveTime=reliableNow;
-    G.lastServerTime=reliableNow;
-    return;
-  }
+  try{
+    // --- Tamper detection ---
+    // G.lastServerTime is the last real server timestamp we recorded
+    // If local clock is behind it, the clock was wound back — skip
+    if(G.lastServerTime&&reliableNow<G.lastServerTime-5000){
+      addLog('⚠ Time anomaly detected. Offline progress skipped.','danger');
+      showOverlay('Time anomaly detected.\nOffline progress skipped.','danger','Security Check');
+      G.lastSaveTime=reliableNow;
+      G.lastServerTime=reliableNow;
+      return false;
+    }
 
-  // Calculate elapsed from last save
-  const rawElapsed=(reliableNow-(G.lastSaveTime||reliableNow))/1000;
+    // Calculate elapsed from last save
+    const rawElapsed=(reliableNow-(G.lastSaveTime||reliableNow))/1000;
 
   // --- Tick cross-check for non-cloud players ---
   // The game tick increments every real second while the game is open.
@@ -215,8 +276,8 @@ async function applyOfflineProgress(){
   }
 
   // Hard cap at offlineCapHours regardless
-  elapsed=Math.min(elapsed, G.offlineCapHours*3600);
-  if(elapsed<30) return;
+    elapsed=Math.min(elapsed, G.offlineCapHours*3600);
+    if(elapsed<30)return false;
 
   const boost=earlyBoost();
   const ticks=Math.floor(elapsed);
@@ -298,9 +359,25 @@ async function applyOfflineProgress(){
   showOverlay(`Welcome back!\nKingdom progressed ${label} offline.`,'success','Offline Progress');
 
   // Update timestamps
-  G.lastSaveTime=reliableNow;
-  G.lastServerTime=reliableNow;
-  G._tickAtLastLoad=G.tick;
+    G.lastSaveTime=reliableNow;
+    G.lastServerTime=reliableNow;
+    G._tickAtLastLoad=G.tick;
+    return true;
+  }finally{
+    _offlineApplying=false;
+  }
+}
+
+function handleAppBackground(){
+  if(!_offlineReady)return;
+  saveGame();
+}
+
+async function handleAppForeground(){
+  if(!_offlineReady)return;
+  const progressed=await applyOfflineProgress();
+  if(progressed)renderAll();
+  saveGame();
 }
 
 // ── VICTORY PATHS ──
@@ -1070,19 +1147,28 @@ function init(){
   setTimeout(attachTabTouch, 100); // fallback if DOMContentLoaded already fired
 
   renderAll();
+  attachResourceCardClicks();
   setInterval(gameTick,1000);
   setInterval(renderAll,3000);
   setInterval(saveGame,30000);
   setInterval(()=>cloudSave(),120000);
   requestAnimationFrame(animateTickBar);
   checkForUpdate();
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='hidden')handleAppBackground();
+    if(document.visibilityState==='visible')handleAppForeground();
+  });
+  window.addEventListener('pagehide',handleAppBackground);
+  window.addEventListener('pageshow',e=>{if(e.persisted)handleAppForeground();});
   cloudLoad().then(loaded=>{
     if(!loaded){
       loadGame();
       G._tickAtLastLoad=G.tick;
     }
-    applyOfflineProgress();
-    renderAll();
+    applyOfflineProgress().then(()=>{
+      _offlineReady=true;
+      renderAll();
+    });
   });
 }
 
@@ -1339,7 +1425,7 @@ function renderResources(){
       const capColor=pct>=95?'var(--blood-light)':pct>=75?'#e8a020':'var(--forest-light)';
       const nearCap=pct>=95;
       const gain=effectiveResourceRate(k);
-      return`<div class="rc" onclick="showResourceStorageTimes()" title="Storage time" style="${nearCap?'border-color:rgba(192,57,43,.4);':''}">
+      return`<div class="rc" data-resource-card="${k}" role="button" tabindex="0" title="Storage time" style="${nearCap?'border-color:rgba(192,57,43,.4);':''}">
         <div class="rc-top"><div class="rc-icon">${r.icon}</div><div class="rc-name">${r.name}</div></div>
         <div class="rc-amount">${Math.floor(r.amount)}</div>
         <div class="rc-rate ${gain<0?'neg':''}">${gain>0?'+':''}${gain.toFixed(1)}/min</div>
@@ -1349,6 +1435,18 @@ function renderResources(){
         </div>
       </div>`;
     }).join('');
+}
+
+function attachResourceCardClicks(){
+  const el=document.getElementById('resource-grid');if(!el||el._resourceClicksAttached)return;
+  el._resourceClicksAttached=true;
+  el.addEventListener('click',e=>{
+    if(e.target.closest('[data-resource-card]'))showResourceStorageTimes();
+  });
+  el.addEventListener('keydown',e=>{
+    if(!e.target.closest('[data-resource-card]'))return;
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();showResourceStorageTimes();}
+  });
 }
 
 function effectiveResourceRate(key){
@@ -1377,7 +1475,7 @@ function resourceCapLine(key,r){
 
 function showResourceStorageTimes(){
   const lines=Object.entries(G.resources).map(([k,r])=>resourceCapLine(k,r));
-  showSnot(lines.join('\n'),5200);
+  showOverlay(lines.join('\n'),'success','Storage Forecast');
 }
 
 function renderBuildings(){
@@ -1662,8 +1760,9 @@ function renderFaction(){
 
     <div class="section">
       <div class="section-title">☁ Cloud Save & Updates</div>
-      <div style="font-size:12px;color:var(--stone-light);font-style:italic;margin-bottom:8px">Installed version: <span style="color:var(--gold);font-family:'Cinzel',serif">v${APP_VERSION}</span></div>
+      <div style="font-size:12px;color:var(--stone-light);font-style:italic;margin-bottom:8px">Installed version: <span data-version-label style="color:var(--gold);font-family:'Cinzel',serif">v${APP_VERSION} / ${CACHE_VERSION}</span></div>
       <button onclick="manualCheckForUpdate()" style="width:100%;padding:7px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:3px;color:var(--gold);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-bottom:10px">Check for Update</button>
+      <button onclick="forceReloadLatest()" style="width:100%;padding:7px;background:rgba(139,26,26,.1);border:1px solid rgba(139,26,26,.35);border-radius:3px;color:#d4826a;font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-bottom:10px">Reload Latest Version</button>
       ${G.supabaseUrl?
         `<div style="font-size:12px;color:var(--forest-light);margin-bottom:10px">✓ Cloud save connected</div>
          <button onclick="cloudSave()" style="width:100%;padding:7px;background:rgba(74,122,50,.1);border:1px solid rgba(74,122,50,.3);border-radius:3px;color:var(--forest-light);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-bottom:6px">Save to Cloud Now</button>
