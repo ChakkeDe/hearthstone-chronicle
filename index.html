@@ -425,11 +425,11 @@ const G={
   lastSaveTime: Date.now(),  // for offline calculation
   offlineCapHours:12,
   resources:{
-    gold: {amount:50,rate:2,max:500,icon:'🪙',name:'Gold'},
-    food: {amount:80,rate:3,max:500,icon:'🌾',name:'Food'},
-    wood: {amount:60,rate:3,max:500,icon:'🪵',name:'Wood'},
-    stone:{amount:30,rate:2,max:500,icon:'⚙', name:'Stone'},
-    iron: {amount:0, rate:0,max:300,icon:'⛏', name:'Iron'},
+    gold: {amount:150, rate:2,  max:500, icon:'🪙',name:'Gold'},
+    food: {amount:200, rate:3,  max:500, icon:'🌾',name:'Food'},
+    wood: {amount:180, rate:3,  max:500, icon:'🪵',name:'Wood'},
+    stone:{amount:120, rate:2,  max:500, icon:'⚙', name:'Stone'},
+    iron: {amount:10, rate:0.5,max:300,icon:'⛏', name:'Iron'},
     mana: {amount:0, rate:0,max:200,icon:'✨',name:'Mana'},
   },
   buildings:[],research:{},heroes:[],
@@ -458,8 +458,9 @@ const G={
 };
 
 function earlyBoost(){
+  // Tapers from 5x at 0 buildings to 1x at 25 total levels — much slower fade
   const t=G.buildings.reduce((s,b)=>s+b.level,0);
-  return Math.max(1,5-t*0.4);
+  return Math.max(1, 5-(t*0.16));
 }
 
 const APP_VERSION = '0.6.0';
@@ -755,7 +756,7 @@ function beginNewDynasty(){
     food:{amount:150,rate:3,max:500,icon:'🌾',name:'Food'},
     wood:{amount:120,rate:3,max:500,icon:'🪵',name:'Wood'},
     stone:{amount:80,rate:2,max:500,icon:'⚙',name:'Stone'},
-    iron:{amount:0,rate:0,max:300,icon:'⛏',name:'Iron'},
+    iron:{amount:10,rate:0.5,max:300,icon:'⛏',name:'Iron'},
     mana:{amount:0,rate:0,max:200,icon:'✨',name:'Mana'},
   });
   G.buildings.forEach(b=>b.level=0);
@@ -876,38 +877,60 @@ function applyLoadedState(s){
   G.log=s.log||G.log;
 }
 
+// Cost helper — cheap early levels, steep later. Base * 1.8^(level-1)
+function bCost(base, l){
+  return Math.round(base * Math.pow(1.8, l-1));
+}
+
 const BD=[
-  {id:'farm',  name:'Grain Farm',   icon:'🌾',max:5,tier:1,desc:'Fertile fields feed your growing kingdom.',
-   eff:l=>`+${l*2} food/min`,cost:l=>({wood:20*l,stone:10*l}),
-   onBuild:l=>{G.resources.food.rate+=2;},unlocks:['lumber','mine']},
-  {id:'lumber',name:'Lumber Mill',  icon:'🪵',max:5,tier:1,desc:'Axes ring through the ancient forest.',
-   eff:l=>`+${l*2} wood/min`,cost:l=>({gold:15*l,stone:10*l}),
-   onBuild:l=>{G.resources.wood.rate+=2;},unlocks:['mine','market']},
-  {id:'mine',  name:'Stone Quarry', icon:'⛰', max:5,tier:1,desc:'Chisels bite deep into the hillside.',
-   eff:l=>`+${l*2} stone/min`,cost:l=>({wood:25*l,food:10*l}),
-   onBuild:l=>{G.resources.stone.rate+=2;},unlocks:['market','ironworks']},
-  {id:'market',name:'Grand Market', icon:'⚖', max:4,tier:2,desc:'Merchants bring coin from distant lands.',
-   eff:l=>`+${l*3} gold/min`,cost:l=>({wood:30*l,stone:20*l,food:15*l}),
-   onBuild:l=>{G.resources.gold.rate+=3;},unlocks:['ironworks']},
-  {id:'ironworks',name:'Iron Foundry',icon:'🔥',max:4,tier:2,desc:'Fire and hammer shape the future of war.',
-   eff:l=>`+${l} iron/min`,cost:l=>({stone:40*l,gold:30*l,wood:20*l}),
-   onBuild:l=>{G.resources.iron.rate+=1;},
-   req:{mine:2},unlocks:['tower','barracks']},
-  {id:'tower', name:'Mage Tower',   icon:'🗼',max:3,tier:3,desc:'Ancient ley lines channel arcane power.',
-   eff:l=>`+${l} mana/min, +${l*5}% research speed`,cost:l=>({stone:60*l,gold:50*l,iron:10*l}),
-   onBuild:l=>{G.resources.mana.rate+=1;revealR(['runic_script']);unlockTab('arcane');},
+  {id:'farm',  name:'Grain Farm',   icon:'🌾',max:10,tier:1,desc:'Fertile fields feed your growing kingdom.',
+   eff:l=>`+${l*3} food/min`,
+   cost:l=>({wood:bCost(8,l), stone:bCost(4,l)}),
+   onBuild:l=>{G.resources.food.rate+=3;},unlocks:['lumber','mine']},
+
+  {id:'lumber',name:'Lumber Mill',  icon:'🪵',max:10,tier:1,desc:'Axes ring through the ancient forest.',
+   eff:l=>`+${l*3} wood/min`,
+   cost:l=>({gold:bCost(6,l), stone:bCost(4,l)}),
+   onBuild:l=>{G.resources.wood.rate+=3;},unlocks:['mine','market']},
+
+  {id:'mine',  name:'Stone Quarry', icon:'⛰', max:10,tier:1,desc:'Chisels bite deep into the hillside.',
+   eff:l=>`+${l*3} stone/min`,
+   cost:l=>({wood:bCost(10,l), food:bCost(5,l)}),
+   onBuild:l=>{G.resources.stone.rate+=3;},unlocks:['market','ironworks']},
+
+  {id:'market',name:'Grand Market', icon:'⚖', max:8,tier:2,desc:'Merchants bring coin from distant lands.',
+   eff:l=>`+${l*5} gold/min`,
+   cost:l=>({wood:bCost(20,l), stone:bCost(12,l), food:bCost(8,l)}),
+   onBuild:l=>{G.resources.gold.rate+=5;},unlocks:['ironworks']},
+
+  {id:'ironworks',name:'Iron Foundry',icon:'🔥',max:8,tier:2,desc:'Fire and hammer shape the future of war.',
+   eff:l=>`+${l*4} iron/min`,
+   cost:l=>({stone:bCost(15,l), gold:bCost(12,l), wood:bCost(8,l)}),
+   onBuild:l=>{G.resources.iron.rate+=4;},
+   req:{mine:1},unlocks:['tower','barracks']},
+
+  {id:'tower', name:'Mage Tower',   icon:'🗼',max:6,tier:3,desc:'Ancient ley lines channel arcane power.',
+   eff:l=>`+${l*2} mana/min, +${l*5}% research speed`,
+   cost:l=>({stone:bCost(40,l), gold:bCost(30,l), iron:bCost(8,l)}),
+   onBuild:l=>{G.resources.mana.rate+=2;revealR(['runic_script']);unlockTab('arcane');},
    req:{ironworks:1},unlocks:['citadel']},
-  {id:'barracks',name:"King's Barracks",icon:'⚔',max:4,tier:3,desc:'Soldiers train under the banner of the West.',
-   eff:l=>`Unlocks hero slots. +${l*10}% hero combat`,cost:l=>({wood:40*l,stone:30*l,iron:5*l}),
-   onBuild:l=>{if(l===1)spawnHero();if(l===3)spawnHero();},
+
+  {id:'barracks',name:"King's Barracks",icon:'⚔',max:8,tier:3,desc:'Soldiers train under the banner of the West.',
+   eff:l=>`+${l*10}% hero combat power`,
+   cost:l=>({wood:bCost(25,l), stone:bCost(18,l), iron:bCost(5,l)}),
+   onBuild:l=>{if(l===1)spawnHero();if(l===3)spawnHero();if(l===6)spawnHero();},
    req:{ironworks:1},unlocks:['citadel']},
-  {id:'citadel',name:'Royal Citadel',icon:'🏰',max:3,tier:4,desc:'The seat of power. Expands caps and unlocks diplomacy.',
-   eff:l=>`+${l*200} all caps, +${l*20} prestige/min`,cost:l=>({gold:100*l,stone:80*l,iron:30*l,wood:60*l}),
-   onBuild:l=>{Object.values(G.resources).forEach(r=>r.max+=200);G.prestigeRate=(G.prestigeRate||0)+20;revealR(['envoys']);unlockTab('diplomacy');},
+
+  {id:'citadel',name:'Royal Citadel',icon:'🏰',max:5,tier:4,desc:'The seat of power. Expands caps and unlocks diplomacy.',
+   eff:l=>`+${l*300} all caps, +${l*25} prestige/min`,
+   cost:l=>({gold:bCost(80,l), stone:bCost(60,l), iron:bCost(25,l), wood:bCost(40,l)}),
+   onBuild:l=>{Object.values(G.resources).forEach(r=>r.max+=300);G.prestigeRate=(G.prestigeRate||0)+25;revealR(['envoys']);unlockTab('diplomacy');},
    req:{barracks:2,tower:1}},
-  {id:'hospital',name:'Field Hospital',icon:'🏥',max:4,tier:3,desc:'Treats wounded soldiers. Increases recovery capacity.',
-   eff:l=>`Recover up to ${50+l*50} troops. ${l*20}% faster healing.`,cost:l=>({wood:30*l,stone:25*l,food:20*l}),
-   onBuild:l=>{G.hospital.capacity=50+l*50;},
+
+  {id:'hospital',name:'Field Hospital',icon:'🏥',max:6,tier:3,desc:'Treats wounded soldiers. Increases recovery capacity.',
+   eff:l=>`Recover up to ${100+l*100} troops`,
+   cost:l=>({wood:bCost(20,l), stone:bCost(15,l), food:bCost(10,l)}),
+   onBuild:l=>{G.hospital.capacity=100+l*100;},
    req:{barracks:1}},
 ];
 
@@ -1400,7 +1423,6 @@ function gameTick(){
   seasonTick();
   checkVictoryPath();
   updateBadges();
-  G.lastSaveTime=getReliableNow();
 }
 
 // ── TABS ──
@@ -1790,6 +1812,8 @@ function animateTickBar(ts){
 
 // ── SAVE / LOAD ──
 function saveGame(){
+  G.lastSaveTime=getReliableNow();
+  G.lastServerTime=G.lastSaveTime;
   try{localStorage.setItem('hc4',JSON.stringify(buildSavePayload()));}catch(e){}
 }
 function loadGame(){
