@@ -349,6 +349,7 @@ body::before{content:'';position:fixed;inset:0;
 .fres-amt{font-family:'Cinzel',serif;font-size:11px;color:var(--parchment);line-height:1;}
 .fres-rate{font-size:9px;color:var(--forest-light);line-height:1;margin-top:1px;}
 .fres-rate.neg{color:var(--blood-light);}
+.fres-cap{font-size:8px;color:var(--stone-light);line-height:1.05;margin-top:1px;white-space:nowrap;}
 .fres-bar{width:36px;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;margin-top:2px;}
 .fres-fill{height:100%;border-radius:2px;transition:width .5s,background .5s;}
 .fres-fill.low{background:var(--forest-light);}
@@ -365,13 +366,10 @@ body::before{content:'';position:fixed;inset:0;
 .rc-amount{font-family:'Cinzel',serif;font-size:18px;color:var(--gold-light);font-weight:600;line-height:1;}
 .rc-rate{font-size:11px;color:var(--forest-light);font-style:italic;}
 .rc-rate.neg{color:var(--blood-light);}
+.rc-captext{font-size:9px;color:var(--stone-light);line-height:1.15;margin-top:2px;white-space:nowrap;}
 .rc-capbar{height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;margin-top:4px;}
 .rc-capfill{height:100%;border-radius:2px;transition:width .5s,background .5s;}
 .snot{max-width:min(340px,calc(100vw - 24px));white-space:pre-line;line-height:1.35;text-align:left;}
-.resource-forecast{grid-column:1/-1;background:rgba(10,8,4,.72);border:1px solid rgba(201,168,76,.22);border-radius:4px;padding:9px 10px;}
-.resource-forecast-title{font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;margin-bottom:5px;}
-.resource-forecast-row{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--parchment-dark);line-height:1.45;border-top:1px solid rgba(201,168,76,.08);padding-top:4px;margin-top:4px;}
-.resource-forecast-row span:last-child{font-family:'Cinzel',serif;color:var(--forest-light);white-space:nowrap;}
 
 /* WAR CHEST */
 .warchest-card{background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.2);
