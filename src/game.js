@@ -76,11 +76,29 @@ function earlyBoost(){
 }
 
 function researchSpeedMultiplier(){
-  return G.legacyRelics.includes('relic_research') ? (1/0.9) : 1;
+  const stacks=Math.min(countRelic('relic_research'),RELIC_STACK_CAP);
+  return stacks ? (1/(1-(stacks*0.1))) : 1;
 }
 
-const APP_VERSION = '0.7.8';
-const CACHE_VERSION = 'hc-v27';
+function countRelic(id){
+  return (G.legacyRelics||[]).filter(r=>r===id).length;
+}
+
+function capRelicStacks(relics){
+  const counts={};
+  return (relics||[]).filter(id=>{
+    counts[id]=(counts[id]||0)+1;
+    return counts[id]<=RELIC_STACK_CAP;
+  });
+}
+
+function relicLabel(id){
+  return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
+}
+
+const APP_VERSION = '0.7.9';
+const CACHE_VERSION = 'hc-v28';
+const RELIC_STACK_CAP = 5;
 
 // ── UPDATE CHECKER ──
 let _updateReloading=false;
@@ -309,10 +327,7 @@ async function applyOfflineProgress(sinceTime=null){
     G.researchProgress2=Math.min(G.researchProgress2+(ticks*researchSpeedMultiplier()),99999);
     const rDef2=allR().find(r=>r.id===G.activeResearch2);
     if(rDef2&&G.researchProgress2>=rDef2.time){
-      G.research[rDef2.id].completed=true;
-      rDef2.effect();G.prestige+=30;
-      G.activeResearch2=null;G.researchProgress2=0;
-      addLog(`Research complete (offline): ${rDef2.name}.`,'important');
+      completeResearchQueue2(rDef2,'offline');
     }
   }
 
@@ -452,12 +467,14 @@ function showSeasonEndScreen(finalPrestige, path){
       </div>
       <div style="font-size:12px;color:var(--gold-dark);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Choose Your Legacy Relic</div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
-        ${relicOptions.map(r=>`
-          <div onclick="selectRelic('${r.id}')" data-relic="${r.id}" style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.2);border-radius:4px;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .2s;">
+        ${relicOptions.map(r=>{
+          const stacks=countRelic(r.id), capped=stacks>=RELIC_STACK_CAP;
+          return`
+          <div onclick="selectRelic('${r.id}')" data-relic="${r.id}" data-capped="${capped?1:0}" style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.2);border-radius:4px;padding:10px 14px;cursor:${capped?'not-allowed':'pointer'};display:flex;align-items:center;gap:10px;transition:all .2s;opacity:${capped?0.45:1}">
             <span style="font-size:22px">${r.icon}</span>
             <div><div style="font-family:'Cinzel',serif;font-size:12px;color:var(--parchment)">${r.name}</div>
-            <div style="font-size:11px;color:var(--stone-light);font-style:italic">${r.desc}</div></div>
-          </div>`).join('')}
+            <div style="font-size:11px;color:var(--stone-light);font-style:italic">${r.desc} · ${stacks}/${RELIC_STACK_CAP}${capped?' max':''}</div></div>
+          </div>`}).join('')}
       </div>
       <button onclick="beginNewDynasty()" id="new-dynasty-btn" disabled style="width:100%;padding:12px;background:rgba(201,168,76,.1);border:1px solid var(--gold-dark);border-radius:4px;color:var(--gold);font-family:'Cinzel',serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;cursor:not-allowed;opacity:.4">
         Begin New Dynasty
@@ -470,6 +487,7 @@ function showSeasonEndScreen(finalPrestige, path){
 
 let _selectedRelic=null;
 function selectRelic(id){
+  if(countRelic(id)>=RELIC_STACK_CAP){showSnot('Relic stack cap reached');return;}
   _selectedRelic=id;
   document.querySelectorAll('[data-relic]').forEach(el=>{
     el.style.borderColor=el.dataset.relic===id?'var(--gold)':'rgba(201,168,76,.2)';
@@ -481,6 +499,7 @@ function selectRelic(id){
 
 function beginNewDynasty(){
   if(!_selectedRelic)return;
+  if(countRelic(_selectedRelic)>=RELIC_STACK_CAP){showSnot('Relic stack cap reached');return;}
   G.legacyRelics.push(_selectedRelic);
   G.dynasty++;
   G.season++;
@@ -601,7 +620,7 @@ function applyLoadedState(s){
   G.year=s.year||1;G.prestige=s.prestige||0;G.prestigeRate=s.prestigeRate||0;
   G.prestigePoints=s.prestigePoints||0;
   G.season=s.season||1;G.seasonWeek=s.seasonWeek||1;G.seasonTick=s.seasonTick||0;
-  G.dynasty=s.dynasty||0;G.legacyRelics=s.legacyRelics||[];
+  G.dynasty=s.dynasty||0;G.legacyRelics=capRelicStacks(s.legacyRelics||[]);
   G.victoryPath=s.victoryPath||'mixed';G.victoryBonus=s.victoryBonus||0;
   G.lastSaveTime=s.lastSaveTime||Date.now();
   G.lastActiveTime=s.lastActiveTime||s.lastSaveTime||Date.now();
@@ -899,7 +918,7 @@ function renderCombat(){
       <div class="npc-loot">Loot: ${lootStr}</div>
       <div class="npc-power-row">
         <span>Required: ${farm.def}</span>
-        <span class="${canBeat?'ok':'low'}">Ready: ${readyPower}</span>
+        <span class="${canBeat?'ok':'low'}">Available power: ${readyPower}</span>
       </div>
       ${!farm.available?
         `<div style="font-size:11px;color:var(--stone-light);font-style:italic">Respawns in ${minsToRespawn}m</div>`
@@ -1248,11 +1267,7 @@ function gameTick(){
     G.researchProgress2+=researchSpeedMultiplier();
     const rDef2=allR().find(r=>r.id===G.activeResearch2);
     if(rDef2&&G.researchProgress2>=rDef2.time){
-      G.research[rDef2.id].completed=true;
-      G.activeResearch2=null;G.researchProgress2=0;
-      rDef2.effect();G.prestige+=30;
-      addLog(`Research complete (queue 2): ${rDef2.name}.`,'important');
-      showOverlay(`✦ ${rDef2.name} complete`,'success','Research');
+      completeResearchQueue2(rDef2);
     }
   }
   G.heroes.forEach(h=>{if(h.qt>0){h.qt--;if(h.qt<=0)completeQuest(h);}});
@@ -1343,12 +1358,26 @@ function startResearch(id){
 }
 function completeResearch(rDef){
   G.research[rDef.id].completed=true;G.activeResearch=null;G.researchProgress=0;
-  rDef.eff();G.prestige+=30;
+  applyResearchEffect(rDef);G.prestige+=30;
   if(rDef.unlocks)revealR(rDef.unlocks);
   addLog(`Research complete: ${rDef.name}.`,'important');
   showOverlay(`${rDef.name} complete!`,'success','Research Done');
   setBadge('research',G.activeTab!=='research');
   renderAll();
+}
+
+function applyResearchEffect(rDef){
+  if(typeof rDef?.eff==='function')rDef.eff();
+}
+
+function completeResearchQueue2(rDef,mode='queue 2'){
+  G.research[rDef.id].completed=true;
+  G.activeResearch2=null;G.researchProgress2=0;
+  applyResearchEffect(rDef);G.prestige+=30;
+  if(rDef.unlocks)revealR(rDef.unlocks);
+  addLog(`Research complete (${mode}): ${rDef.name}.`,'important');
+  showOverlay(`✦ ${rDef.name} complete`,'success','Research');
+  setBadge('research',G.activeTab!=='research');
 }
 function switchResearchTab(tab){
   if(!G.unlockedResearchTabs.includes(tab)){showSnot('This branch is not yet unlocked');return;}
@@ -1375,9 +1404,14 @@ function sendOnQuest(i){
   const q=avail[Math.floor(Math.random()*avail.length)];
   let t=q.t;if(G.questTimeMulti)t=Math.round(t*G.questTimeMulti);
   h.onQuest=true;h.qt=t;h.qname=q.name;h.qDef=q;h._ret=false;
-  addLog(`${h.name} departs for: ${q.name}. ~${Math.round(t/60)} min.`);
+  addLog(`${h.name} departs for: ${q.name}. Reward: ${questRewardText(q)}. ~${Math.round(t/60)} min.`);
   renderHeroes();
 }
+
+function questRewardText(q){
+  return `${Object.entries(q.rew).map(([res,amt])=>`${G.resources[res]?.icon||res}${amt}`).join(' ')} · XP ${q.xp}`;
+}
+
 function completeQuest(h){
   const q=h.qDef;
   if(Math.random()<q.danger&&!G.wardProtect){
@@ -1388,6 +1422,7 @@ function completeQuest(h){
     addLog(`🛡 Wards of Protection saved ${h.name}!`);
   }
   Object.entries(q.rew).forEach(([res,amt])=>{if(G.resources[res])G.resources[res].amount=Math.min(G.resources[res].max,G.resources[res].amount+amt);});
+  const rewardText=questRewardText(q);
   h.xp+=q.xp;
   if(h.xp>=h.xpGoal){
     h.level++;h.xp-=h.xpGoal;h.xpGoal=Math.round(h.xpGoal*1.5);h.power=Math.round(h.power*1.15);
@@ -1396,7 +1431,8 @@ function completeQuest(h){
   }
   h.onQuest=false;h.qt=0;h.qname='';h._ret=true;
   G.prestige+=15;
-  addLog(`${h.name} returns from ${q.name}. Loot secured.`);
+  addLog(`${h.name} returns from ${q.name}. Rewards: ${rewardText}.`);
+  showOverlay(`${rewardText}\n+15 prestige`,'success','Quest Rewards');
   setBadge('heroes',G.activeTab!=='heroes');
   renderAll();
 }
@@ -1719,6 +1755,7 @@ function renderHeroes(){
   el.innerHTML=G.heroes.map((h,i)=>{
     const xpP=Math.round((h.xp/h.xpGoal)*100);
     const avail=QUESTS.filter(q=>h.power>=q.minP);
+    const bestQuest=avail[avail.length-1];
     let status='Resting in the keep',sc='';
     if(h.onQuest){const m=Math.ceil(h.qt/60);status=`On quest: ${h.qname} (~${m}m)`;sc='onq';}
     return`<div class="hcard">
@@ -1732,6 +1769,7 @@ function renderHeroes(){
       <div style="font-size:10px;color:var(--stone-light);margin-bottom:3px">XP ${h.xp}/${h.xpGoal}</div>
       <div class="hxp"><div class="hxp-i" style="width:${xpP}%"></div></div>
       <div class="hstatus ${sc}">${status}</div>
+      ${bestQuest&&!h.onQuest?`<div style="font-size:10px;color:var(--stone-light);font-style:italic;margin-bottom:5px">Possible reward: ${questRewardText(bestQuest)}</div>`:''}
       <button class="qbtn ${h.onQuest?'ret':''}" onclick="${h.onQuest?'':(`sendOnQuest(${i})`)}" ${h.onQuest||!avail.length?'disabled':''}>
         ${h.onQuest?'⏳ On Quest':(avail.length?`⚔ Send on Quest (${avail.length} available)`:'⚠ Too Weak')}
       </button>
@@ -1750,7 +1788,7 @@ function renderFaction(){
       <div class="section-title">⚔ Men of the West · Dynasty ${G.dynasty||1}</div>
       <div class="ftrait"><div class="ftrait-name">Diplomatic Mastery</div><div class="ftrait-desc">Can form vassal treaties. Tribute scales with prestige.</div></div>
       <div class="ftrait"><div class="ftrait-name">Balanced Arts</div><div class="ftrait-desc">All research branches cost the same. Master of all paths.</div></div>
-      ${G.legacyRelics.length?`<div class="ftrait"><div class="ftrait-name">Legacy Relics</div><div class="ftrait-desc">${G.legacyRelics.map(r=>({relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[r]||r)).join(' · ')}</div></div>`:''}
+      ${G.legacyRelics.length?`<div class="ftrait"><div class="ftrait-name">Legacy Relics</div><div class="ftrait-desc">${[...new Set(G.legacyRelics)].map(r=>`${relicLabel(r)} x${countRelic(r)}/${RELIC_STACK_CAP}`).join(' · ')}</div></div>`:''}
     </div>
 
     <div class="section">
