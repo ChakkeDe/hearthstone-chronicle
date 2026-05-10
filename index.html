@@ -24,13 +24,13 @@
 <div id="header">
   <div>
     <h1>Hearthstone Chronicles</h1>
-    <div class="sub">Age of the First Kings Â· <span data-version-label>v0.9.2 / hc-v32</span></div>
+    <div class="sub">Age of the First Kings · <span data-version-label>v0.9.3 / hc-v33</span></div>
   </div>
   <div style="display:flex;align-items:center;gap:8px;">
-    <div id="power-badge">âš” <span id="power-val">0</span></div>
+    <div id="power-badge">⚔ <span id="power-val">0</span></div>
     <div class="faction-badge">
-      <div class="fname">âš” Men of the West</div>
-      <div class="fera" id="era-display">First Age Â· Year 1</div>
+      <div class="fname">⚔ Men of the West</div>
+      <div class="fera" id="era-display">First Age · Year 1</div>
     </div>
   </div>
 </div>
@@ -50,12 +50,12 @@
 
 <div id="shell">
   <div id="sidebar">
-    <button class="stab active" data-tab="kingdom" onclick="switchTab('kingdom')">ðŸ°<span class="slabel">Kingdom</span></button>
-    <button class="stab" data-tab="build" onclick="switchTab('build')">ðŸ—<span class="slabel">Build</span><span class="bdot" id="bdot-build"></span></button>
-    <button class="stab" data-tab="research" onclick="switchTab('research')">ðŸ“š<span class="slabel">Research</span><span class="bdot" id="bdot-research"></span></button>
-    <button class="stab" data-tab="combat" onclick="switchTab('combat')">âš”<span class="slabel">Combat</span><span class="bdot" id="bdot-combat"></span></button>
-    <button class="stab" data-tab="heroes" onclick="switchTab('heroes')">ðŸ¦¸<span class="slabel">Heroes</span><span class="bdot" id="bdot-heroes"></span></button>
-    <button class="stab" data-tab="faction" onclick="switchTab('faction')">âšœ<span class="slabel">Faction</span></button>
+    <button class="stab active" data-tab="kingdom" onclick="switchTab('kingdom')">🏰<span class="slabel">Kingdom</span></button>
+    <button class="stab" data-tab="build" onclick="switchTab('build')">🏗<span class="slabel">Build</span><span class="bdot" id="bdot-build"></span></button>
+    <button class="stab" data-tab="research" onclick="switchTab('research')">📚<span class="slabel">Research</span><span class="bdot" id="bdot-research"></span></button>
+    <button class="stab" data-tab="combat" onclick="switchTab('combat')">⚔<span class="slabel">Combat</span><span class="bdot" id="bdot-combat"></span></button>
+    <button class="stab" data-tab="heroes" onclick="switchTab('heroes')">🦸<span class="slabel">Heroes</span><span class="bdot" id="bdot-heroes"></span></button>
+    <button class="stab" data-tab="faction" onclick="switchTab('faction')">⚜<span class="slabel">Faction</span></button>
   </div>
 
   <div id="content">
@@ -68,12 +68,12 @@
       </div>
       <div class="section" style="padding:0;overflow:hidden;border-radius:6px;">
         <div id="city-view">
-          <div class="city-title">âš” Kingdom of Arnethia â€” tap a building to manage it</div>
+          <div class="city-title">⚔ Kingdom of Arnethia — tap a building to manage it</div>
           <div class="city-map" id="city-map"></div>
         </div>
       </div>
       <div class="section">
-        <div class="section-title">ðŸ“œ Chronicle</div>
+        <div class="section-title">📜 Chronicle</div>
         <div class="log-entries" id="log-entries"></div>
       </div>
     </div>
@@ -120,12 +120,12 @@
 
 <div id="bottombar">
   <div class="btabs">
-    <button class="btab active" data-tab="kingdom" onclick="switchTab('kingdom')">ðŸ°<span class="blabel">Kingdom</span></button>
-    <button class="btab" data-tab="build" onclick="switchTab('build')">ðŸ—<span class="blabel">Build</span><span class="bdot" id="mbdot-build"></span></button>
-    <button class="btab" data-tab="research" onclick="switchTab('research')">ðŸ“š<span class="blabel">Research</span><span class="bdot" id="mbdot-research"></span></button>
-    <button class="btab" data-tab="combat" onclick="switchTab('combat')">âš”<span class="blabel">Combat</span><span class="bdot" id="mbdot-combat"></span></button>
-    <button class="btab" data-tab="heroes" onclick="switchTab('heroes')">ðŸ¦¸<span class="blabel">Heroes</span><span class="bdot" id="mbdot-heroes"></span></button>
-    <button class="btab" data-tab="faction" onclick="switchTab('faction')">âšœ<span class="blabel">Faction</span></button>
+    <button class="btab active" data-tab="kingdom" onclick="switchTab('kingdom')">🏰<span class="blabel">Kingdom</span></button>
+    <button class="btab" data-tab="build" onclick="switchTab('build')">🏗<span class="blabel">Build</span><span class="bdot" id="mbdot-build"></span></button>
+    <button class="btab" data-tab="research" onclick="switchTab('research')">📚<span class="blabel">Research</span><span class="bdot" id="mbdot-research"></span></button>
+    <button class="btab" data-tab="combat" onclick="switchTab('combat')">⚔<span class="blabel">Combat</span><span class="bdot" id="mbdot-combat"></span></button>
+    <button class="btab" data-tab="heroes" onclick="switchTab('heroes')">🦸<span class="blabel">Heroes</span><span class="bdot" id="mbdot-heroes"></span></button>
+    <button class="btab" data-tab="faction" onclick="switchTab('faction')">⚜<span class="blabel">Faction</span></button>
   </div>
 </div>
 
@@ -140,7 +140,7 @@
 <script src="src/game.js" defer></script>
 <!-- BUILDING POPUP -->
 <div id="building-popup">
-  <button class="bp-close" onclick="closePopup()">âœ•</button>
+  <button class="bp-close" onclick="closePopup()">✕</button>
   <div class="bp-name" id="bp-name"></div>
   <div class="bp-desc" id="bp-desc"></div>
   <div class="bp-stats" id="bp-stats"></div>
@@ -150,6 +150,8 @@
 
 </body>
 </html>
+
+
 
 
 

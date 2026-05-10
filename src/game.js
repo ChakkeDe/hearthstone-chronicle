@@ -15,12 +15,12 @@
   lastActiveTime: Date.now(), // last real game tick timestamp for AFK calculation
   offlineCapHours:12,
   resources:{
-    gold: {amount:150, rate:2,  max:500, icon:'ðŸª™',name:'Gold'},
-    food: {amount:200, rate:3,  max:500, icon:'ðŸŒ¾',name:'Food'},
-    wood: {amount:180, rate:3,  max:500, icon:'ðŸªµ',name:'Wood'},
-    stone:{amount:120, rate:2,  max:500, icon:'âš™', name:'Stone'},
-    iron: {amount:15, rate:1,  max:300,icon:'â›', name:'Iron'},
-    mana: {amount:0, rate:0,max:200,icon:'âœ¨',name:'Mana'},
+    gold: {amount:150, rate:2,  max:500, icon:'🪙',name:'Gold'},
+    food: {amount:200, rate:3,  max:500, icon:'🌾',name:'Food'},
+    wood: {amount:180, rate:3,  max:500, icon:'🪵',name:'Wood'},
+    stone:{amount:120, rate:2,  max:500, icon:'⚙', name:'Stone'},
+    iron: {amount:15, rate:1,  max:300,icon:'⛏', name:'Iron'},
+    mana: {amount:0, rate:0,max:200,icon:'✨',name:'Mana'},
   },
   buildings:[],research:{},heroes:[],
   activeResearch:null,researchProgress:0,
@@ -74,7 +74,7 @@
 };
 
 function earlyBoost(){
-  // Tapers from 5x at 0 buildings to 1x at 25 total levels â€” much slower fade
+  // Tapers from 5x at 0 buildings to 1x at 25 total levels — much slower fade
   const t=G.buildings.reduce((s,b)=>s+b.level,0);
   return Math.max(1, 5-(t*0.16));
 }
@@ -97,11 +97,11 @@ function capRelicStacks(relics){
 }
 
 function relicLabel(id){
-  return {relic_gold:'ðŸª™ Merchant\'s Seal',relic_combat:'âš” Sword of Ages',relic_research:'ðŸ“š Ancient Tome'}[id]||id;
+  return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '0.9.1';
-const CACHE_VERSION = 'hc-v31';
+const APP_VERSION = '0.9.3';
+const CACHE_VERSION = 'hc-v33';
 const RELIC_STACK_CAP = 5;
 
 const VILLAGE_FOCUS={
@@ -173,12 +173,12 @@ function showUpdateBanner(msg='New version available'){
     font-family:'Cinzel',serif;font-size:12px;color:var(--gold-light);
     box-shadow:0 4px 20px rgba(0,0,0,.6);white-space:nowrap;`;
   el.innerHTML=`
-    <span>âœ¦ ${msg}</span>
+    <span>✦ ${msg}</span>
     <button onclick="applyUpdate()" style="background:rgba(201,168,76,.2);border:1px solid var(--gold);
       border-radius:3px;padding:4px 10px;color:var(--gold);font-family:'Cinzel',serif;
       font-size:10px;letter-spacing:1px;cursor:pointer;touch-action:manipulation;">Update</button>
     <button onclick="this.parentElement.remove()" style="background:none;border:none;
-      color:var(--stone-light);font-size:16px;cursor:pointer;padding:0 4px;touch-action:manipulation;">âœ•</button>`;
+      color:var(--stone-light);font-size:16px;cursor:pointer;padding:0 4px;touch-action:manipulation;">✕</button>`;
   document.body.appendChild(el);
 }
 
@@ -187,7 +187,7 @@ async function manualCheckForUpdate(){
     showSnot('Updates are not supported in this browser');
     return;
   }
-  showSnot(`Checking for updates â€” v${APP_VERSION}`);
+  showSnot(`Checking for updates — v${APP_VERSION}`);
   try{
     const reg=await navigator.serviceWorker.ready;
     await reg.update();
@@ -283,9 +283,9 @@ async function applyOfflineProgress(sinceTime=null){
   try{
     // --- Tamper detection ---
     // G.lastServerTime is the last real server timestamp we recorded
-    // If local clock is behind it, the clock was wound back â€” skip
+    // If local clock is behind it, the clock was wound back — skip
     if(G.lastServerTime&&reliableNow<G.lastServerTime-5000){
-      addLog('âš  Time anomaly detected. Offline progress skipped.','danger');
+      addLog('⚠ Time anomaly detected. Offline progress skipped.','danger');
       showOverlay('Time anomaly detected.\nOffline progress skipped.','danger','Security Check');
       G.lastSaveTime=reliableNow;
       G.lastServerTime=reliableNow;
@@ -305,13 +305,13 @@ async function applyOfflineProgress(sinceTime=null){
   let elapsed=rawElapsed;
 
   if(!G.supabaseUrl){
-    // No cloud â€” apply tick sanity check
+    // No cloud — apply tick sanity check
     // Max believable offline = raw elapsed, but cap if it's >10% more than what ticks account for
     // Only apply check if game has been open long enough to have meaningful ticks
     if(localSessionSeconds>10&&rawElapsed>localSessionSeconds*1.1){
-      // Something smells off â€” use a conservative estimate
+      // Something smells off — use a conservative estimate
       elapsed=Math.min(rawElapsed, G._lastKnownOfflineCap||rawElapsed);
-      addLog('âš  Clock discrepancy detected. Offline gains capped conservatively.','danger');
+      addLog('⚠ Clock discrepancy detected. Offline gains capped conservatively.','danger');
     }
   }
 
@@ -322,7 +322,7 @@ async function applyOfflineProgress(sinceTime=null){
   const boost=earlyBoost();
   const ticks=Math.floor(elapsed);
 
-  // â”€â”€ ADVANCE G.tick first â€” this fixes ALL absolute-tick timers â”€â”€
+  // â”€â”€ ADVANCE G.tick first — this fixes ALL absolute-tick timers â”€â”€
   // Troop training, hospital, raids, respawns all use G.tick comparisons
   G.tick+=ticks;
 
@@ -359,7 +359,7 @@ async function applyOfflineProgress(sinceTime=null){
     if(h.onQuest&&h.qt>0){h.qt=Math.max(0,h.qt-ticks);if(h.qt<=0)completeQuest(h);}
   });
 
-  // Troop training â€” now works because G.tick was advanced
+  // Troop training — now works because G.tick was advanced
   Object.entries(G.troops).forEach(([type,t])=>{
     if(t.training>0&&G.tick>=t.trainEnd){
       t.available+=t.training;t.total+=t.training;
@@ -437,7 +437,7 @@ function spendPrestige(ability){
   if(G.prestigePoints<ability.cost){showSnot('Not enough prestige points');return;}
   if(G.tick-ability.lastUsed<ability.cooldown){
     const rem=Math.ceil((ability.cooldown-(G.tick-ability.lastUsed))/60);
-    showSnot(`Ability on cooldown â€” ${rem} min remaining`);return;
+    showSnot(`Ability on cooldown — ${rem} min remaining`);return;
   }
   G.prestigePoints-=ability.cost;
   ability.lastUsed=G.tick;
@@ -568,7 +568,7 @@ async function cloudSave(){
       },
       body:JSON.stringify({id:'player_1',data:JSON.stringify(payload),updated_at:new Date().toISOString()}),
     });
-    if(res.ok) addLog('Kingdom chronicle saved to the cloud. â˜','');
+    if(res.ok) addLog('Kingdom chronicle saved to the cloud. ☁','');
   }catch(e){console.warn('Cloud save failed:',e);}
 }
 
@@ -585,13 +585,13 @@ async function cloudLoad(){
     if(!rows.length)return false;
     const s=JSON.parse(rows[0].data);
     // Use the DB's updated_at as the authoritative last-save time
-    // This is set by the server â€” the client cannot fake it
+    // This is set by the server — the client cannot fake it
     const dbUpdatedAt=new Date(rows[0].updated_at).getTime();
     s.lastSaveTime=dbUpdatedAt;
     s.lastServerTime=dbUpdatedAt;
     applyLoadedState(s);
     G._tickAtLastLoad=G.tick;
-    addLog('Dynasty restored from the cloud. â˜','important');
+    addLog('Dynasty restored from the cloud. ☁','important');
     return true;
   }catch(e){return false;}
 }
@@ -672,7 +672,7 @@ function applyLoadedState(s){
   G.log=s.log||G.log;
 }
 
-// Cost helper â€” cheap early levels, steeper later. Base * 1.65^(level-1)
+// Cost helper — cheap early levels, steeper later. Base * 1.65^(level-1)
 function bCost(base, l){
   return Math.round(base * Math.pow(1.65, l-1));
 }
@@ -982,7 +982,7 @@ function resolveRaid(raid){
       if(G.resources[res])G.resources[res].amount=Math.min(G.resources[res].max,G.resources[res].amount+loot[res]);
     });
 
-    // NPC â€” troops injured not killed
+    // NPC — troops injured not killed
     const injuryRate=Math.max(0,(farm.def/atkPow)*0.3);
     let totalInjured=0;
     Object.entries(raid.sent).forEach(([type,qty])=>{
@@ -995,7 +995,7 @@ function resolveRaid(raid){
 
     const lootStr=Object.entries(loot).map(([r,v])=>`${G.resources[r]?.icon||r}${v}`).join(' ');
     addLog(`Victory at ${farm.name}! Loot: ${lootStr}. Injured: ${totalInjured}.`,'important');
-    G.combatLog.unshift({msg:`âœ“ ${farm.name} â€” ${lootStr}`,type:'victory',time:`Yr.${G.year}`});
+    G.combatLog.unshift({msg:`✓ ${farm.name} — ${lootStr}`,type:'victory',time:`Yr.${G.year}`});
     addRaidReport({
       farmName:farm.name,
       icon:farm.icon,
@@ -1015,14 +1015,14 @@ function resolveRaid(raid){
     if(totalInjured>0) recoverInjured(totalInjured);
 
   } else {
-    // Defeat â€” all troops injured (NPC so no permanent death)
+    // Defeat — all troops injured (NPC so no permanent death)
     let totalInjured=0;
     Object.entries(raid.sent).forEach(([type,qty])=>{
       G.troops[type].injured+=qty;
       totalInjured+=qty;
     });
-    addLog(`âš  Defeated at ${farm.name}. ${totalInjured} troops injured.`,'danger');
-    G.combatLog.unshift({msg:`âœ— ${farm.name} â€” repelled, ${totalInjured} injured`,type:'defeat',time:`Yr.${G.year}`});
+    addLog(`⚠ Defeated at ${farm.name}. ${totalInjured} troops injured.`,'danger');
+    G.combatLog.unshift({msg:`✗ ${farm.name} — repelled, ${totalInjured} injured`,type:'defeat',time:`Yr.${G.year}`});
     addRaidReport({
       farmName:farm.name,
       icon:farm.icon,
@@ -1051,7 +1051,7 @@ function recoverInjured(count){
   const hospitalLvl=blvl('hospital')||0;
   const cap=50+(hospitalLvl*50);
   const canRecover=Math.min(count,cap-G.hospital.recovering);
-  if(canRecover<=0){addLog('Hospital full â€” some troops could not be recovered.','danger');return;}
+  if(canRecover<=0){addLog('Hospital full — some troops could not be recovered.','danger');return;}
   G.hospital.recovering+=canRecover;
   const recoverTime=canRecover*10; // 10 ticks per troop
   G.hospital.recoverEnd=Math.max(G.hospital.recoverEnd,G.tick+recoverTime);
@@ -1085,7 +1085,7 @@ function renderCombat(){
   const readyPower=calcReadyTroopPower();
 
   if(barracksLvl===0){
-    tab.innerHTML=`<div class="section"><div class="section-title">âš” Combat</div>
+    tab.innerHTML=`<div class="section"><div class="section-title">⚔ Combat</div>
       <div style="font-size:13px;color:var(--stone-light);font-style:italic;padding:8px 0">
         Build the King's Barracks to raise an army.
       </div></div>`;
@@ -1098,7 +1098,7 @@ function renderCombat(){
     if(!unlocked) return`<div class="tcard" style="opacity:.4">
       <div class="tcard-header"><span class="tcard-icon">${def.icon}</span>
       <span class="tcard-name" style="font-size:9px">Req. Barracks ${def.reqBarracks}</span></div>
-      <div style="font-size:10px;color:var(--stone-light);font-style:italic">${def.name} â€” locked</div>
+      <div style="font-size:10px;color:var(--stone-light);font-style:italic">${def.name} — locked</div>
     </div>`;
     const trainPct=t.training>0?Math.round(((G.tick-(t.trainEnd-TROOP_DEF[type].trainTime*t.training))/(TROOP_DEF[type].trainTime*t.training))*100):0;
     const minsLeft=t.training>0?Math.ceil((t.trainEnd-G.tick)/60):0;
@@ -1108,13 +1108,13 @@ function renderCombat(){
         <div class="tstat"><div class="tstat-v">${t.available}</div><div class="tstat-l">Ready</div></div>
         <div class="tstat"><div class="tstat-v ${t.injured?'injured':''}">${t.injured}</div><div class="tstat-l">Injured</div></div>
       </div>
-      ${t.training>0?`<div style="font-size:10px;color:var(--gold);font-style:italic;margin-bottom:4px">Training ${t.training}â€¦ ${minsLeft}m left</div>
+      ${t.training>0?`<div style="font-size:10px;color:var(--gold);font-style:italic;margin-bottom:4px">Training ${t.training}… ${minsLeft}m left</div>
         <div class="raid-progress"><div class="raid-progress-inner" style="width:${trainPct}%"></div></div>`:''}
       <div style="display:flex;gap:4px;margin-top:6px">
         <input type="number" inputmode="numeric" pattern="[0-9]*" autocomplete="off" id="train-qty-${type}" min="1" max="999" value="10"
           style="width:50px;padding:4px;background:rgba(255,255,255,.04);border:1px solid rgba(201,168,76,.2);border-radius:3px;color:var(--parchment);font-size:11px;text-align:center;">
         <button class="train-btn" onclick="trainFromInput('${type}')" ${t.training>0?'disabled':''} style="flex:1">
-          ${t.training>0?'Trainingâ€¦':'Train'}
+          ${t.training>0?'Training…':'Train'}
         </button>
       </div>
       <div style="font-size:9px;color:var(--stone-light);margin-top:3px">Cost/unit: ${Object.entries(def.cost).map(([r,v])=>`${G.resources[r]?.icon||r}${v}`).join(' ')}</div>
@@ -1124,12 +1124,12 @@ function renderCombat(){
   const hospitalLvl=blvl('hospital')||0;
   const hospitalHtml=`<div class="hospital-card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-      <span style="font-family:'Cinzel',serif;font-size:11px;color:var(--forest-light)">ðŸ¥ Hospital</span>
+      <span style="font-family:'Cinzel',serif;font-size:11px;color:var(--forest-light)">🏥 Hospital</span>
       <span style="font-size:10px;color:var(--stone-light)">${hospitalLvl===0?'Not built':
         `Capacity: ${50+hospitalLvl*50}`}</span>
     </div>
     ${G.hospital.recovering>0?
-      `<div style="font-size:11px;color:var(--forest-light)">${G.hospital.recovering} troops recoveringâ€¦
+      `<div style="font-size:11px;color:var(--forest-light)">${G.hospital.recovering} troops recovering…
         ${Math.ceil((G.hospital.recoverEnd-G.tick)/60)}m remaining</div>
         <div class="raid-progress" style="margin-top:4px"><div class="raid-progress-inner" style="width:${Math.round(((G.tick-(G.hospital.recoverEnd-G.hospital.recovering*10))/(G.hospital.recovering*10))*100)}%;background:var(--forest-light)"></div></div>`
       :`<div style="font-size:11px;color:var(--stone-light);font-style:italic">${hospitalLvl===0?'Build a Hospital to recover injured troops faster.':'No troops recovering.'}</div>`
@@ -1138,7 +1138,7 @@ function renderCombat(){
 
   const activeRaidsHtml=G.activeRaids.length?`
     <div class="section">
-      <div class="section-title">â³ Active Raids</div>
+      <div class="section-title">⏳ Active Raids</div>
       ${G.activeRaids.map(r=>{
         const pct=Math.round(((G.tick-(r.returnAt-r.travelTime*2))/(r.travelTime*2))*100);
         const minsLeft=Math.ceil((r.returnAt-G.tick)/60);
@@ -1189,12 +1189,12 @@ function renderCombat(){
               <input type="number" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="send-input" id="send-${farm.id}-${type}" min="0" max="${G.troops[type].available}" value="0" placeholder="0">
             </div>`).join('')}
         </div>
-        <button class="attack-btn" onclick="launchAttack('${farm.id}')">âš” Attack</button>
+        <button class="attack-btn" onclick="launchAttack('${farm.id}')">⚔ Attack</button>
         ${G.combatLog.some(e=>e.msg.includes(farm.name)&&e.type==='victory')?`
         <div class="autofarm-row">
           <div class="toggle-wrap">
             <div class="toggle ${G.autoFarm[farm.id]?.enabled?'on':''}" onclick="toggleAutoFarm('${farm.id}')"></div>
-            <span class="toggle-label">Auto-farm ${G.autoFarm[farm.id]?.enabled?'ON âš¡':'OFF'}</span>
+            <span class="toggle-label">Auto-farm ${G.autoFarm[farm.id]?.enabled?'ON ⚡':'OFF'}</span>
           </div>
           <span style="font-size:10px;color:var(--stone-light)">Floor: ${G.autoFarm[farm.id]?.floor||20}%</span>
         </div>
@@ -1225,7 +1225,7 @@ function renderCombat(){
 
   const combatLogHtml=G.combatLog.length?`
     <div class="section">
-      <div class="section-title">ðŸ“œ Battle Reports</div>
+      <div class="section-title">📜 Battle Reports</div>
       <div class="combat-log">
         ${G.combatLog.map(e=>`<div class="clog-entry ${e.type||''}"><span style="font-size:9px;color:var(--gold-dark);font-family:'Cinzel',serif">${e.time}</span> ${e.msg}</div>`).join('')}
       </div>
@@ -1233,13 +1233,13 @@ function renderCombat(){
 
   tab.innerHTML=`
     <div class="section">
-      <div class="section-title">âš” Army</div>
+      <div class="section-title">⚔ Army</div>
       ${hospitalHtml}
       <div class="troop-grid">${troopsHtml}</div>
     </div>
     ${activeRaidsHtml}
     <div class="section">
-      <div class="section-title">ðŸ—º NPC Farms</div>
+      <div class="section-title">🗺 NPC Farms</div>
       <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-bottom:8px">Defeat NPC villages to steal resources, build control, then bring them under your banner as tributaries.</div>
       <div class="npc-list">${npcHtml}</div>
     </div>
@@ -1311,17 +1311,17 @@ function renderResourceBar(){
 function renderWarChest(){
   return`<div class="warchest-card">
     <div class="wc-header">
-      <span class="wc-title">âš” War Chest</span>
+      <span class="wc-title">⚔ War Chest</span>
       <span style="font-family:'Cinzel',serif;font-size:11px;color:var(--gold)">${Math.floor(G.warChest)} / ${G.warChestCap}</span>
     </div>
     <div class="wc-bar"><div class="wc-fill" style="width:${Math.min(100,Math.round((G.warChest/G.warChestCap)*100))}%"></div></div>
     <div style="font-size:10px;color:var(--stone-light);font-style:italic;margin-top:4px;margin-bottom:6px">
       Converted this week: ${Math.floor(G.warChestWeeklyConverted)} / ${G.warChestWeeklyLimit}
-      ${G.victoryPath==='diplomatic'?` Â· <span style="color:var(--forest-light)">10% conversion bonus active</span>`:''}
+      ${G.victoryPath==='diplomatic'?` · <span style="color:var(--forest-light)">10% conversion bonus active</span>`:''}
     </div>
     <button class="wc-convert-btn" onclick="convertToWarChest()"
       ${G.warChestWeeklyConverted>=G.warChestWeeklyLimit||G.warChest>=G.warChestCap?'disabled':''}>
-      Convert 100 Gold â†’ War Chest
+      Convert 100 Gold → War Chest
     </button>
   </div>`;
 }
@@ -1337,7 +1337,7 @@ function convertToWarChest(){
   G.resources.gold.amount-=cost;
   G.warChest=Math.min(G.warChestCap,G.warChest+converted);
   G.warChestWeeklyConverted+=converted;
-  addLog(`Converted ${cost} gold â†’ ${converted} War Chest.`);
+  addLog(`Converted ${cost} gold → ${converted} War Chest.`);
   renderFaction();
 }
 
@@ -1349,7 +1349,7 @@ function warChestDecayTick(){
     const decayMod=G.victoryPath==='research'?0.5:1; // Elves: slower decay (placeholder)
     G.warChest=Math.max(0,G.warChest-(decayAmt*decayMod));
     G.lastWarChestDecay=now;
-    if(decayAmt>1) addLog(`War chest decayed by ${Math.floor(decayAmt)} â€” stay active in battles to prevent loss.`,'danger');
+    if(decayAmt>1) addLog(`War chest decayed by ${Math.floor(decayAmt)} — stay active in battles to prevent loss.`,'danger');
   }
 }
 
@@ -1375,7 +1375,7 @@ function checkAutoFarm(){
     const floorPct=(af.floor||20)/100;
     if(totalAvail<totalAll*floorPct){
       if(!af._warned){
-        showOverlay(`Auto-farm paused â€” troops below ${af.floor}% threshold`,'danger','Auto-Farm');
+        showOverlay(`Auto-farm paused — troops below ${af.floor}% threshold`,'danger','Auto-Farm');
         af._warned=true;
       }
       return;
@@ -1386,7 +1386,7 @@ function checkAutoFarm(){
     const lootVal=Object.entries(farm.loot).reduce((s,[r,v])=>s+(r==='gold'?v:v*0.5),0);
     const repairCost=totalAvail*0.1*5; // rough estimate
     if(repairCost>lootVal*0.8){
-      showOverlay(`Auto-farm paused â€” repair costs outweigh loot at ${farm.name}`,'danger','Efficiency Warning');
+      showOverlay(`Auto-farm paused — repair costs outweigh loot at ${farm.name}`,'danger','Efficiency Warning');
       af.enabled=false;
       renderCombat();
       return;
@@ -1408,7 +1408,7 @@ function startResearch2(id){
   if(!canAfford(rDef.cost)){showSnot('Insufficient resources');return;}
   spend(rDef.cost);
   G.activeResearch2=id;G.researchProgress2=0;
-  addLog(`Second queue: researching ${rDef.name}â€¦`);
+  addLog(`Second queue: researching ${rDef.name}…`);
   renderResearch();
 }
 function revealB(id){
@@ -1448,7 +1448,7 @@ function init(){
   addLog('Your kingdom of Arnethia rises from humble beginnings.','important');
   addLog('Build farms and mills. Discover what lies ahead.');
 
-  // iOS Safari fix â€” attach touchend listeners to all tab buttons
+  // iOS Safari fix — attach touchend listeners to all tab buttons
   // This fires before the 300ms click delay and works reliably on iOS
   document.addEventListener('DOMContentLoaded',()=>attachTabTouch());
   setTimeout(attachTabTouch, 100); // fallback if DOMContentLoaded already fired
@@ -1518,16 +1518,16 @@ function gameTick(){
   Object.values(G.resources).forEach(r=>{if(r.rate>0)r.amount=Math.min(r.max,r.amount+(r.rate*boost)/60);});
   if(G.hasAlchemy&&G.tick%60===0&&G.resources.mana.amount>=10){
     G.resources.mana.amount-=10;G.resources.gold.amount=Math.min(G.resources.gold.max,G.resources.gold.amount+50);
-    addLog('Alchemy transmutes 10 mana â†’ 50 gold. âœ¨');
+    addLog('Alchemy transmutes 10 mana → 50 gold. ✨');
   }
-  // Passive prestige trickle â€” 1 point per minute from start
+  // Passive prestige trickle — 1 point per minute from start
   if(G.tick%60===0){
     const rate=1+(G.prestigeRate>0?G.prestigeRate*(1+(G.victoryBonus/100)):0);
     G.prestige=Math.min(G.prestigeGoal, G.prestige+rate);
     G.prestigePoints=Math.min(9999, G.prestigePoints+Math.floor(rate/5));
     applyVillageTribute(1);
   }
-  // Secondary iron from quarry â€” 0.2/min per mine level
+  // Secondary iron from quarry — 0.2/min per mine level
   const mineLvl=blvl('mine');
   if(mineLvl>0&&G.tick%60===0) G.resources.iron.amount=Math.min(G.resources.iron.max, G.resources.iron.amount+(mineLvl*0.2));
   if(G.tick%300===0){G.year++;addLog(`Year ${G.year} of the ${G.era}. The kingdom endures.`);}
@@ -1551,7 +1551,7 @@ function gameTick(){
   if(G.tick%120===0){
     Object.entries(G.resources).forEach(([k,r])=>{
       if(r.rate>0&&r.amount/r.max>=0.95){
-        addLog(`âš  ${r.name} storage nearly full (${Math.floor(r.amount)}/${r.max}) â€” build storage or spend resources.`,'danger');
+        addLog(`⚠ ${r.name} storage nearly full (${Math.floor(r.amount)}/${r.max}) — build storage or spend resources.`,'danger');
       }
     });
   }
@@ -1614,7 +1614,7 @@ function buildBuilding(id){
   if(bDef.unlocks)bDef.unlocks.forEach(uid=>revealB(uid));
   addLog(`${bDef.name} upgraded to level ${nl}. ${bDef.eff(nl)}.`,'important');
   const mt=G.mapTiles.find(t=>t.id===id);if(mt)mt.built=true;
-  showOverlay(`${bDef.icon} ${bDef.name} â€” Level ${nl}\n${bDef.eff(nl)}`,'success','Constructed');
+  showOverlay(`${bDef.icon} ${bDef.name} — Level ${nl}\n${bDef.eff(nl)}`,'success','Constructed');
   renderAll();
 }
 
@@ -1650,7 +1650,7 @@ function completeResearchQueue2(rDef,mode='queue 2'){
   applyResearchEffect(rDef);G.prestige+=30;
   if(rDef.unlocks)revealR(rDef.unlocks);
   addLog(`Research complete (${mode}): ${rDef.name}.`,'important');
-  showOverlay(`âœ¦ ${rDef.name} complete`,'success','Research');
+  showOverlay(`✦ ${rDef.name} complete`,'success','Research');
   setBadge('research',G.activeTab!=='research');
 }
 function switchResearchTab(tab){
@@ -1683,17 +1683,17 @@ function sendOnQuest(i){
 }
 
 function questRewardText(q){
-  return `${Object.entries(q.rew).map(([res,amt])=>`${G.resources[res]?.icon||res}${amt}`).join(' ')} Â· XP ${q.xp}`;
+  return `${Object.entries(q.rew).map(([res,amt])=>`${G.resources[res]?.icon||res}${amt}`).join(' ')} · XP ${q.xp}`;
 }
 
 function completeQuest(h){
   const q=h.qDef;
   if(Math.random()<q.danger&&!G.wardProtect){
     h.hp=Math.max(1,h.hp-30);
-    addLog(`âš  ${h.name} returns wounded!`,'danger');
+    addLog(`⚠ ${h.name} returns wounded!`,'danger');
     showOverlay(`${h.name} returns wounded from ${q.name}.`,'danger','Hero Injured');
   } else if(Math.random()<q.danger&&G.wardProtect){
-    addLog(`ðŸ›¡ Wards of Protection saved ${h.name}!`);
+    addLog(`🛡 Wards of Protection saved ${h.name}!`);
   }
   Object.entries(q.rew).forEach(([res,amt])=>{if(G.resources[res])G.resources[res].amount=Math.min(G.resources[res].max,G.resources[res].amount+amt);});
   const rewardText=questRewardText(q);
@@ -1748,7 +1748,7 @@ function renderAll(){
   renderFaction();
   if(G.logDirty){renderLog();G.logDirty=false;}
   renderPrestige();
-  document.getElementById('era-display').textContent=`${G.era} Â· Year ${G.year}`;
+  document.getElementById('era-display').textContent=`${G.era} · Year ${G.year}`;
   ['arcane','diplomacy'].forEach(tab=>{
     const el=document.getElementById('rtab-'+tab);
     if(el)el.classList.toggle('tab-locked',!G.unlockedResearchTabs.includes(tab));
@@ -1764,7 +1764,7 @@ function renderResources(){
     ? 'First long-term goal: break a village twice, fill its control bar, then crown it as a tributary.'
     : `Realm goal: hold ${governedVillageCount()}/${currentAdminCap()} governed villages and keep tribute flowing.`;
   const rows=[
-    boost>1?`<div class="boost-row">âš¡ Early Kingdom Bonus: ${boost.toFixed(1)}x income active</div>`:'',
+    boost>1?`<div class="boost-row">⚡ Early Kingdom Bonus: ${boost.toFixed(1)}x income active</div>`:'',
     `<div class="boost-row" style="color:var(--gold)">👑 Realm: ${governedVillageCount()}/${currentAdminCap()} villages governed · Tribute ${tributeText}</div>`,
     `<div class="boost-row" style="color:var(--stone-light);font-style:italic">${goalText}</div>`
   ].filter(Boolean).join('');
@@ -1782,7 +1782,7 @@ function renderResources(){
         <div class="rc-captext">${capText}</div>
         <div class="rc-capbar"><div class="rc-capfill" style="width:${pct}%;background:${capColor}"></div></div>
         <div style="font-size:8px;color:var(--stone-light);margin-top:2px">${Math.floor(r.amount)}/${r.max}
-          ${nearCap?`<span style="color:var(--blood-light)"> âš  Full</span>`:''}
+          ${nearCap?`<span style="color:var(--blood-light)"> ⚠ Full</span>`:''}
         </div>
       </div>`;
     }).join('');
@@ -1860,9 +1860,9 @@ function renderBuildings(){
       // show mystery if parent built
       const parentBuilt=BD.some(b=>b.unlocks?.includes(bDef.id)&&blvl(b.id)>=1);
       if(!parentBuilt)return;
-      html+=`<div class="mystery"><div class="mystery-icon">ðŸ”’</div>
+      html+=`<div class="mystery"><div class="mystery-icon">🔒</div>
         <div><div class="mystery-title">??? Unknown Structure</div>
-        <div class="mystery-hint">Develop your kingdom further to revealâ€¦</div></div></div>`;
+        <div class="mystery-hint">Develop your kingdom further to reveal…</div></div></div>`;
       return;
     }
     const bState=G.buildings.find(b=>b.id===bDef.id);
@@ -1876,9 +1876,9 @@ function renderBuildings(){
       <div class="bheader"><span class="bname">${bDef.icon} ${bDef.name}</span><span class="blvl">Lv ${lvl}/${bDef.max}</span></div>
       <div class="bdesc">${bDef.desc}</div>
       ${lvl>0?`<div class="beff">${bDef.eff(lvl)}</div>`:''}
-      ${!req?'<div style="font-size:11px;color:var(--blood-light);font-style:italic;margin-bottom:4px">âš  Requires prerequisites</div>':''}
+      ${!req?'<div style="font-size:11px;color:var(--blood-light);font-style:italic;margin-bottom:4px">⚠ Requires prerequisites</div>':''}
       <div class="bcosts">${cHtml}</div>
-      ${!maxed?`<button class="bbtn" onclick="buildBuilding('${bDef.id}')" ${aff?'':'disabled'}>${lvl===0?'Construct':'Upgrade'} â€” Level ${nl}</button>`:''}
+      ${!maxed?`<button class="bbtn" onclick="buildBuilding('${bDef.id}')" ${aff?'':'disabled'}>${lvl===0?'Construct':'Upgrade'} — Level ${nl}</button>`:''}
     </div>`;
   });
   el.innerHTML=html;
@@ -1900,7 +1900,7 @@ function renderMap(){
     return`<div class="city-zone" style="left:${z.x}%;top:${z.y}%;width:${z.w}%;height:${z.h}%;"
       onclick="openBuildingPopup('${z.id}')" title="${z.label}">
       ${lvl>0?`<div class="zone-badge">${lvl>0?`<span class="zone-icon">${bDef.icon}</span>`:''}<span class="zone-lvl">Lv${lvl}</span></div>`:''}
-      ${!revealed?`<div class="zone-locked">ðŸ”’</div>`:''}
+      ${!revealed?`<div class="zone-locked">🔒</div>`:''}
       ${revealed&&lvl===0&&reqMet?`<div class="zone-build">+</div>`:''}
     </div>`;
   }).join('');
@@ -1942,7 +1942,7 @@ function openBuildingPopup(id){
   if(maxed){btn.textContent='Maxed Out';btn.disabled=true;}
   else if(!reqMet){btn.textContent='Requirements not met';btn.disabled=true;}
   else if(!affordable){btn.textContent='Need more resources';btn.disabled=true;}
-  else{btn.textContent=`${lvl===0?'âš’ Construct':'âš’ Upgrade'} â€” Level ${nextLvl}`;btn.disabled=false;}
+  else{btn.textContent=`${lvl===0?'âš’ Construct':'âš’ Upgrade'} — Level ${nextLvl}`;btn.disabled=false;}
 
   const popup=document.getElementById('building-popup');
   popup.style.top='50%';popup.style.left='50%';
@@ -1984,16 +1984,16 @@ function renderResearch(){
       ${q1Def?`<div style="width:100%">
         <div style="font-family:'Cinzel',serif;font-size:10px;color:var(--gold);margin-bottom:4px">Queue 1: ${q1Def.name}</div>
         <div class="research-progress"><div class="research-progress-inner" style="width:${q1Pct}%"></div></div>
-        <div style="font-size:10px;color:var(--stone-light);margin-top:3px">${q1Pct}% Â· ${Math.ceil((q1Def.time-G.researchProgress)/60)}m remaining</div>
-      </div>`:`<div class="rqueue-empty">Queue 1 â€” tap a research to start</div>`}
+        <div style="font-size:10px;color:var(--stone-light);margin-top:3px">${q1Pct}% · ${Math.ceil((q1Def.time-G.researchProgress)/60)}m remaining</div>
+      </div>`:`<div class="rqueue-empty">Queue 1 — tap a research to start</div>`}
     </div>
     <div class="rqueue-slot ${q2Def?'active':''}" style="${citLvl<3?'opacity:.4':''}">
-      ${citLvl<3?`<div class="rqueue-empty">ðŸ”’ Queue 2 â€” unlocks at Citadel level 3</div>`:
+      ${citLvl<3?`<div class="rqueue-empty">🔒 Queue 2 — unlocks at Citadel level 3</div>`:
         q2Def?`<div style="width:100%">
           <div style="font-family:'Cinzel',serif;font-size:10px;color:var(--gold);margin-bottom:4px">Queue 2: ${q2Def.name}</div>
           <div class="research-progress"><div class="research-progress-inner" style="width:${q2Pct}%;background:var(--forest-light)"></div></div>
-          <div style="font-size:10px;color:var(--stone-light);margin-top:3px">${q2Pct}% Â· ${Math.ceil((q2Def.time-G.researchProgress2)/60)}m remaining</div>
-        </div>`:`<div class="rqueue-empty">Queue 2 â€” tap a research to queue it</div>`
+          <div style="font-size:10px;color:var(--stone-light);margin-top:3px">${q2Pct}% · ${Math.ceil((q2Def.time-G.researchProgress2)/60)}m remaining</div>
+        </div>`:`<div class="rqueue-empty">Queue 2 — tap a research to queue it</div>`
       }
     </div>
   </div>`;
@@ -2011,7 +2011,7 @@ function renderResearch(){
     const vis=rviz(rDef.id);
     const reqMet=!rDef.req||G.research[rDef.req]?.completed;
     const locked=!reqMet&&!done;
-    if(!vis&&!done)return`<div class="ritem rmystery"><div class="rname">??? Unknown Research</div><div class="rdesc">Advance your kingdom to revealâ€¦</div></div>`;
+    if(!vis&&!done)return`<div class="ritem rmystery"><div class="rname">??? Unknown Research</div><div class="rdesc">Advance your kingdom to reveal…</div></div>`;
     const cHtml=Object.entries(rDef.cost).map(([r,a])=>{
       const ok=G.resources[r]?.amount>=a;
       return `<span style="font-size:11px;color:${ok?'var(--parchment-dark)':'var(--blood-light)'}">${G.resources[r]?.icon||r}${a}</span>`;
@@ -2021,12 +2021,12 @@ function renderResearch(){
       onclick="${!done&&!locked&&!G.activeResearch?`startResearch('${rDef.id}')`:''}"
       style="cursor:${!done&&!locked&&!G.activeResearch?'pointer':'default'}">
       <div class="rname" style="display:flex;justify-content:space-between;align-items:center">
-        <span>${done?'âœ“ ':''}${rDef.name}</span>
+        <span>${done?'✓ ':''}${rDef.name}</span>
         ${canQ2?`<button onclick="startResearch2('${rDef.id}')" style="font-size:8px;padding:2px 5px;background:rgba(74,122,50,.15);border:1px solid rgba(74,122,50,.3);border-radius:2px;color:var(--forest-light);cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.5px;touch-action:manipulation">+Q2</button>`:''}
       </div>
       <div class="rdesc">${rDef.desc}</div>
       ${locked?`<div style="font-size:11px;color:var(--blood-light);font-style:italic">Requires: ${rDef.req}</div>`:''}
-      ${!done&&!locked?`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${cHtml}<span style="font-size:11px;color:var(--stone-light)">Â· ${Math.round(rDef.time/60)} min</span></div>`:''}
+      ${!done&&!locked?`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${cHtml}<span style="font-size:11px;color:var(--stone-light)">· ${Math.round(rDef.time/60)} min</span></div>`:''}
       ${isAct?`<div class="rprog"><div class="rprog-inner" style="width:${prog}%"></div></div>`:''}
       ${isAct2?`<div class="rprog"><div class="rprog-inner" style="width:${q2Pct}%;background:var(--forest-light)"></div></div>`:''}
     </div>`;
@@ -2043,8 +2043,8 @@ function renderHeroes(){
     let status='Resting in the keep',sc='';
     if(h.onQuest){const m=Math.ceil(h.qt/60);status=`On quest: ${h.qname} (~${m}m)`;sc='onq';}
     return`<div class="hcard">
-      <div class="hname">âš” ${h.name}</div>
-      <div class="hclass">${h.cls} Â· Level ${h.level}</div>
+      <div class="hname">⚔ ${h.name}</div>
+      <div class="hclass">${h.cls} · Level ${h.level}</div>
       <div class="hstats">
         <div class="hstat"><div class="hstat-v">${h.power}</div><div class="hstat-l">Power</div></div>
         <div class="hstat"><div class="hstat-v">${h.hp}</div><div class="hstat-l">HP</div></div>
@@ -2055,7 +2055,7 @@ function renderHeroes(){
       <div class="hstatus ${sc}">${status}</div>
       ${bestQuest&&!h.onQuest?`<div style="font-size:10px;color:var(--stone-light);font-style:italic;margin-bottom:5px">Possible reward: ${questRewardText(bestQuest)}</div>`:''}
       <button class="qbtn ${h.onQuest?'ret':''}" onclick="${h.onQuest?'':(`sendOnQuest(${i})`)}" ${h.onQuest||!avail.length?'disabled':''}>
-        ${h.onQuest?'â³ On Quest':(avail.length?`âš” Send on Quest (${avail.length} available)`:'âš  Too Weak')}
+        ${h.onQuest?'⏳ On Quest':(avail.length?`⚔ Send on Quest (${avail.length} available)`:'⚠ Too Weak')}
       </button>
     </div>`;
   }).join('');
@@ -2093,10 +2093,10 @@ function renderFaction(){
 
   tab.innerHTML=`
     <div class="section">
-      <div class="section-title">âš” Men of the West Â· Dynasty ${G.dynasty||1}</div>
+      <div class="section-title">⚔ Men of the West · Dynasty ${G.dynasty||1}</div>
       <div class="ftrait"><div class="ftrait-name">Diplomatic Mastery</div><div class="ftrait-desc">Can form vassal treaties. Tribute scales with renown and dynasty growth.</div></div>
       <div class="ftrait"><div class="ftrait-name">Balanced Arts</div><div class="ftrait-desc">All research branches cost the same. Master of all paths.</div></div>
-      ${G.legacyRelics.length?`<div class="ftrait"><div class="ftrait-name">Legacy Relics</div><div class="ftrait-desc">${[...new Set(G.legacyRelics)].map(r=>`${relicLabel(r)} x${countRelic(r)}/${RELIC_STACK_CAP}`).join(' Â· ')}</div></div>`:''}
+      ${G.legacyRelics.length?`<div class="ftrait"><div class="ftrait-name">Legacy Relics</div><div class="ftrait-desc">${[...new Set(G.legacyRelics)].map(r=>`${relicLabel(r)} x${countRelic(r)}/${RELIC_STACK_CAP}`).join(' · ')}</div></div>`:''}
     </div>
 
     <div class="section">
@@ -2109,12 +2109,12 @@ function renderFaction(){
     </div>
 
     <div class="section">
-      <div class="section-title">ðŸ›¡ Kingdom Defence</div>
+      <div class="section-title">🛡 Kingdom Defence</div>
       <div class="defence-card">
         <div class="def-row"><span class="def-title">Wall Defence</span><span class="def-val">${(G.wallDefence||0)+totalWardenWallBonus()}</span></div>
         <div class="def-bar"><div class="def-fill" style="width:${Math.min(100,(((G.wallDefence||0)+totalWardenWallBonus())/500)*100)}%"></div></div>
         <div style="font-size:11px;color:var(--stone-light);margin-top:6px;font-style:italic">
-          ${G.watchtowerUnlocked?'âœ“ Watchtower active â€” raid warnings enabled':'Build Citadel Lv2 to unlock Watchtower'}
+          ${G.watchtowerUnlocked?'✓ Watchtower active — raid warnings enabled':'Build Citadel Lv2 to unlock Watchtower'}
         </div>
         <div style="font-size:11px;color:var(--stone-light);margin-top:4px;font-style:italic">
           Garrison: ${Object.entries(G.garrison||{}).filter(([,v])=>v>0).map(([k,v])=>`${TROOP_DEF[k]?.icon||k}${v}`).join(' ')||'None assigned'}
@@ -2123,7 +2123,7 @@ function renderFaction(){
     </div>
 
     <div class="section">
-      <div class="section-title">âš” War Chest</div>
+      <div class="section-title">⚔ War Chest</div>
       ${renderWarChest()}
       <div style="font-size:11px;color:var(--stone-light);font-style:italic;line-height:1.5">
         War chest funds multiplayer raids and diplomacy. Decays 2%/day if inactive.
@@ -2132,7 +2132,7 @@ function renderFaction(){
     </div>
 
     <div class="section">
-      <div class="section-title">â³ Season ${G.season} Progress</div>
+      <div class="section-title">⏳ Season ${G.season} Progress</div>
       <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--stone-light);margin-bottom:6px">
         <span>Week ${G.seasonWeek} of ${SEASON_WEEKS}</span>
         <span>${weeksLeft} week${weeksLeft!==1?'s':''} remaining</span>
@@ -2141,12 +2141,12 @@ function renderFaction(){
         <div style="height:100%;width:${seasonPct}%;background:linear-gradient(90deg,var(--gold-dark),var(--gold));border-radius:3px;transition:width 1s"></div>
       </div>
       ${G.seasonComplete?`<div style="font-size:12px;color:var(--gold)">Season complete. Advance your dynasty to begin the next chapter.</div>`:
-      (path?`<div style="font-size:12px;color:var(--forest-light)">âœ“ ${path.icon} ${path.label} Â· +${path.bonus}% renown bonus active</div>`:
+      (path?`<div style="font-size:12px;color:var(--forest-light)">✓ ${path.icon} ${path.label} · +${path.bonus}% renown bonus active</div>`:
       `<div style="font-size:12px;color:var(--stone-light);font-style:italic">No victory path achieved yet. Complete a research branch.</div>`)}
     </div>
 
     <div class="section">
-      <div class="section-title">âšœ Crown Abilities</div>
+      <div class="section-title">⚜ Crown Abilities</div>
       <div style="font-size:12px;color:var(--stone-light);font-style:italic;margin-bottom:10px">Spend renown points to activate faction abilities. Points: <span style="color:var(--gold);font-family:'Cinzel',serif">${G.prestigePoints}</span></div>
       ${PRESTIGE_ABILITIES.map(a=>{
         const onCD=G.tick-a.lastUsed<a.cooldown&&a.lastUsed>0;
@@ -2161,19 +2161,19 @@ function renderFaction(){
           ${onCD?`<div style="font-size:11px;color:var(--blood-light)">Cooldown: ${cdRem} min remaining</div>`:''}
           <button onclick="spendPrestige(PRESTIGE_ABILITIES.find(x=>x.id==='${a.id}'))" ${canUse?'':'disabled'}
             style="width:100%;padding:5px;background:${canUse?'rgba(201,168,76,.1)':'rgba(255,255,255,.03)'};border:1px solid ${canUse?'var(--gold-dark)':'rgba(201,168,76,.15)'};border-radius:3px;color:${canUse?'var(--gold)':'var(--stone-light)'};font-family:'Cinzel',serif;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;cursor:${canUse?'pointer':'not-allowed'}">
-            ${onCD?`On Cooldown`:`Activate Â· ${a.cost} pts`}
+            ${onCD?`On Cooldown`:`Activate · ${a.cost} pts`}
           </button>
         </div>`;
       }).join('')}
     </div>
 
     <div class="section">
-      <div class="section-title">â˜ Cloud Save & Updates</div>
+      <div class="section-title">☁ Cloud Save & Updates</div>
       <div style="font-size:12px;color:var(--stone-light);font-style:italic;margin-bottom:8px">Installed version: <span data-version-label style="color:var(--gold);font-family:'Cinzel',serif">v${APP_VERSION} / ${CACHE_VERSION}</span></div>
       <button onclick="manualCheckForUpdate()" style="width:100%;padding:7px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:3px;color:var(--gold);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-bottom:10px">Check for Update</button>
       <button onclick="forceReloadLatest()" style="width:100%;padding:7px;background:rgba(139,26,26,.1);border:1px solid rgba(139,26,26,.35);border-radius:3px;color:#d4826a;font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-bottom:10px">Reload Latest Version</button>
       ${G.supabaseUrl?
-        `<div style="font-size:12px;color:var(--forest-light);margin-bottom:10px">âœ“ Cloud save connected</div>
+        `<div style="font-size:12px;color:var(--forest-light);margin-bottom:10px">✓ Cloud save connected</div>
          <button onclick="cloudSave()" style="width:100%;padding:7px;background:rgba(74,122,50,.1);border:1px solid rgba(74,122,50,.3);border-radius:3px;color:var(--forest-light);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-bottom:6px">Save to Cloud Now</button>
          <button onclick="cloudLoad().then(()=>renderAll())" style="width:100%;padding:7px;background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.2);border-radius:3px;color:var(--gold);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer">Restore from Cloud</button>`
         :
@@ -2187,10 +2187,10 @@ function renderFaction(){
     </div>
 
     <div class="section">
-      <div class="section-title">âš” Trinity Counter System</div>
-      <div class="crow"><span class="cf" style="color:#c9a84c">âš” Men</span><span class="beats">â–¶ beats</span><span class="cf" style="color:#8b1a1a">ðŸº Wildlands</span></div>
-      <div class="crow"><span class="cf" style="color:#c9a84c">âš” Men</span><span class="loses">â—€ weak to</span><span class="cf" style="color:#4a7a32">ðŸŒ¿ Elves</span></div>
-      <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-top:6px;opacity:.6;line-height:1.5">Elves beat Men Â· Dwarves beat Elves Â· Wildlands beat Dwarves<br>Alliances: max ${G.allianceSize} kingdoms Â· Full rivalry unlocks in multiplayer.</div>
+      <div class="section-title">⚔ Trinity Counter System</div>
+      <div class="crow"><span class="cf" style="color:#c9a84c">⚔ Men</span><span class="beats">▶ beats</span><span class="cf" style="color:#8b1a1a">🐺 Wildlands</span></div>
+      <div class="crow"><span class="cf" style="color:#c9a84c">⚔ Men</span><span class="loses">◀ weak to</span><span class="cf" style="color:#4a7a32">🌿 Elves</span></div>
+      <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-top:6px;opacity:.6;line-height:1.5">Elves beat Men · Dwarves beat Elves · Wildlands beat Dwarves<br>Alliances: max ${G.allianceSize} kingdoms · Full rivalry unlocks in multiplayer.</div>
     </div>`;
 }
 
@@ -2241,7 +2241,7 @@ function loadGame(){
     const raw=localStorage.getItem('hc4')||localStorage.getItem('hc3');
     if(!raw)return;
     applyLoadedState(JSON.parse(raw));
-    addLog('Chronicle restored. Your dynasty continuesâ€¦','important');
+    addLog('Chronicle restored. Your dynasty continues…','important');
   }catch(e){}
 }
 
@@ -2264,4 +2264,6 @@ window.addEventListener('DOMContentLoaded', function(){
     document.body.appendChild(div);
   }
 });
+
+
 

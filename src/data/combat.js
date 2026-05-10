@@ -1,4 +1,4 @@
-// Troop and NPC raid target definitions.
+﻿// Troop and NPC raid target definitions.
 const TROOP_DEF={
   infantry:{name:'Infantry',icon:'🗡',atk:10,def:15,carry:20,speed:60, trainTime:8, cost:{food:10,iron:5},  reqBarracks:1,desc:'Sturdy front-line fighters. Strong defence.'},
   archers: {name:'Archers', icon:'🏹',atk:14,def:8, carry:15,speed:90, trainTime:12,cost:{wood:15,iron:8},  reqBarracks:2,desc:'Ranged attackers. High loot efficiency.'},
@@ -14,3 +14,4 @@ const NPC_FARMS=[
   {id:'n5',name:'Ancient Ruins',   icon:'🗺',level:4,def:200,loot:{gold:150,mana:20,iron:60}, tribute:{gold:2.2,mana:0.25,iron:1}, controlNeed:140, respawn:900,available:true,respawnAt:0},
   {id:'n6',name:'Orc Stronghold',  icon:'🏯',level:5,def:400,loot:{gold:200,iron:100,food:80}, tribute:{gold:2.8,iron:1.5,food:1.2}, controlNeed:160, respawn:1200,available:true,respawnAt:0},
 ];
+
