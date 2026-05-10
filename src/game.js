@@ -40,6 +40,7 @@
   },
   hospital:{capacity:100,recovering:0,recoverEnd:0},
   npcFarms:[],activeRaids:[],combatLog:[],
+  raidReports:[],
   autoFarm:{},                    // {farmId: {enabled, troopFloor, lastCheck}}
   // â”€â”€ DEFENCE â”€â”€
   wallDefence:0,
@@ -111,6 +112,12 @@ const VILLAGE_FOCUS={
   stone:{label:'Masonry',desc:'Direct workers toward stone tribute.'},
   iron:{label:'Foundry',desc:'Drive more iron from local forges.'},
   mana:{label:'Sanctum',desc:'Draw out arcane remnants and mana tribute.'},
+};
+
+const GOVERNOR_TRAITS={
+  steward:{label:'Steward',desc:'+20% tribute from this village.'},
+  warden:{label:'Warden',desc:'+40 wall defence while this village is governed.'},
+  quartermaster:{label:'Quartermaster',desc:'+10% loot capacity on raids after this village joins your realm.'},
 };
 
 // â”€â”€ UPDATE CHECKER â”€â”€
@@ -611,6 +618,7 @@ function buildSavePayload(){
            hasFarsight:G.hasFarsight,hasSiege:G.hasSiege,questTimeMulti:G.questTimeMulti,fortBonus:G.fortBonus},
     troops:G.troops,hospital:G.hospital,npcFarms:G.npcFarms,
     activeRaids:G.activeRaids,combatLog:G.combatLog,autoFarm:G.autoFarm,
+    raidReports:G.raidReports,
     wallDefence:G.wallDefence,garrison:G.garrison,watchtowerUnlocked:G.watchtowerUnlocked,
     warChest:G.warChest,warChestCap:G.warChestCap,warChestWeeklyConverted:G.warChestWeeklyConverted,
     lastWarChestDecay:G.lastWarChestDecay,storageLevels:G.storageLevels,
@@ -648,6 +656,7 @@ function applyLoadedState(s){
   if(s.npcFarms)G.npcFarms=s.npcFarms;
   if(s.activeRaids)G.activeRaids=s.activeRaids;
   if(s.combatLog)G.combatLog=s.combatLog;
+  if(s.raidReports)G.raidReports=s.raidReports;
   if(s.autoFarm)G.autoFarm=s.autoFarm;
   if(s.activeResearch2!=null){G.activeResearch2=s.activeResearch2;G.researchProgress2=s.researchProgress2||0;}
   if(s.wallDefence!=null)G.wallDefence=s.wallDefence;
@@ -717,9 +726,10 @@ function calcReadyTroopPower(){
 }
 
 function calcLootCapacity(sent){
-  return Object.entries(sent).reduce((sum,[type,qty])=>{
+  const base=Object.entries(sent).reduce((sum,[type,qty])=>{
     return sum+(TROOP_DEF[type]?.carry||0)*qty;
   },0);
+  return Math.floor(base*(1+totalQuartermasterBonus()));
 }
 
 function farmLootTotal(farm){
@@ -728,7 +738,7 @@ function farmLootTotal(farm){
 
 function getVillageState(farmId){
   if(!G.governedVillages[farmId]){
-    G.governedVillages[farmId]={control:0,victories:0,governed:false,focus:'balanced'};
+    G.governedVillages[farmId]={control:0,victories:0,governed:false,focus:'balanced',trait:'steward'};
   }
   return G.governedVillages[farmId];
 }
@@ -757,16 +767,33 @@ function villageFocusDesc(id){
   return VILLAGE_FOCUS[id]?.desc||'';
 }
 
+function governorTraitLabel(id){
+  return GOVERNOR_TRAITS[id]?.label||id;
+}
+
+function governorTraitDesc(id){
+  return GOVERNOR_TRAITS[id]?.desc||'';
+}
+
+function totalQuartermasterBonus(){
+  return Object.values(G.governedVillages||{}).filter(v=>v.governed&&v.trait==='quartermaster').length*0.1;
+}
+
+function totalWardenWallBonus(){
+  return Object.values(G.governedVillages||{}).filter(v=>v.governed&&v.trait==='warden').length*40;
+}
+
 function villageTributePerMinute(farm){
   const tribute={};
   const state=getVillageState(farm.id);
   const focus=state.focus||'balanced';
+  const traitMult=state.trait==='steward'?1.2:1;
   Object.entries(farm.tribute||{}).forEach(([key,val])=>{
     let focusMult=1;
     if(focus!=='balanced'){
       focusMult=focus===key?1.8:0.7;
     }
-    tribute[key]=val*villageTributeMultiplier()*focusMult;
+    tribute[key]=val*villageTributeMultiplier()*focusMult*traitMult;
   });
   return tribute;
 }
@@ -828,6 +855,7 @@ function governVillage(farmId){
   if(governedVillageCount()>=currentAdminCap()){showSnot('Increase administration capacity first');return;}
   state.governed=true;
   state.focus=state.focus||'balanced';
+  state.trait=state.trait||'steward';
   addLog(`${farm.name} now sends tribute to ${G.kingdomName}.`,'important');
   showOverlay(`${farm.name}\nNow governed. Tribute begins to flow each minute.`,'success','Village Governed');
   renderAll();
@@ -843,6 +871,19 @@ function setVillageFocus(farmId, focus){
   if(state.focus===focus)return;
   state.focus=focus;
   addLog(`${farm.name} now follows a ${villageFocusLabel(focus)} focus.`,'important');
+  renderAll();
+  saveGame();
+}
+
+function setVillageTrait(farmId, trait){
+  const farm=G.npcFarms.find(f=>f.id===farmId);
+  if(!farm)return;
+  const state=getVillageState(farmId);
+  if(!state.governed){showSnot('Govern the village first');return;}
+  if(!GOVERNOR_TRAITS[trait]){showSnot('Unknown governor trait');return;}
+  if(state.trait===trait)return;
+  state.trait=trait;
+  addLog(`${farm.name} now follows a ${governorTraitLabel(trait)} governor.`,'important');
   renderAll();
   saveGame();
 }
@@ -878,6 +919,21 @@ function planRaidTroops(farm){
     canBeat:power>=targetPower,
     canLootAll:carry>=targetCarry,
   };
+}
+
+function raidEfficiencyGrade({victory, lootRatio, injuryRate}){
+  if(!victory)return 'F';
+  const score=(lootRatio*100)-((injuryRate||0)*120);
+  if(score>=92)return 'S';
+  if(score>=78)return 'A';
+  if(score>=62)return 'B';
+  if(score>=45)return 'C';
+  return 'D';
+}
+
+function addRaidReport(report){
+  G.raidReports.unshift(report);
+  G.raidReports=G.raidReports.slice(0,12);
 }
 
 function attackNPC(farmId,sent){
@@ -940,6 +996,20 @@ function resolveRaid(raid){
     const lootStr=Object.entries(loot).map(([r,v])=>`${G.resources[r]?.icon||r}${v}`).join(' ');
     addLog(`Victory at ${farm.name}! Loot: ${lootStr}. Injured: ${totalInjured}.`,'important');
     G.combatLog.unshift({msg:`âœ“ ${farm.name} â€” ${lootStr}`,type:'victory',time:`Yr.${G.year}`});
+    addRaidReport({
+      farmName:farm.name,
+      icon:farm.icon,
+      victory:true,
+      lootTotal:Object.values(loot).reduce((a,b)=>a+b,0),
+      cap,
+      lootRatio,
+      powerSent:atkPow,
+      powerRequired:farm.def,
+      injured:totalInjured,
+      injuryRate,
+      grade:raidEfficiencyGrade({victory:true,lootRatio,injuryRate}),
+      time:`Yr.${G.year}`,
+    });
     G.prestige+=10;
     addVillageControl(farm.id, Math.max(20, 35+(farm.level*5)));
     if(totalInjured>0) recoverInjured(totalInjured);
@@ -953,6 +1023,20 @@ function resolveRaid(raid){
     });
     addLog(`âš  Defeated at ${farm.name}. ${totalInjured} troops injured.`,'danger');
     G.combatLog.unshift({msg:`âœ— ${farm.name} â€” repelled, ${totalInjured} injured`,type:'defeat',time:`Yr.${G.year}`});
+    addRaidReport({
+      farmName:farm.name,
+      icon:farm.icon,
+      victory:false,
+      lootTotal:0,
+      cap:calcLootCapacity(raid.sent),
+      lootRatio:0,
+      powerSent:atkPow,
+      powerRequired:farm.def,
+      injured:totalInjured,
+      injuryRate:1,
+      grade:'F',
+      time:`Yr.${G.year}`,
+    });
     if(totalInjured>0) recoverInjured(totalInjured);
   }
 
@@ -1127,6 +1211,18 @@ function renderCombat(){
     </div>`;
   }).join('');
 
+  const raidReportHtml=G.raidReports.length?`
+    <div class="section">
+      <div class="section-title">🏷 Raid Efficiency</div>
+      <div class="combat-log">
+        ${G.raidReports.map(r=>`<div class="report-card ${r.victory?'victory':'defeat'}">
+          <div class="report-top"><span>${r.icon} ${r.farmName}</span><span class="report-grade">${r.grade}</span></div>
+          <div class="report-meta">${r.time} · Power ${r.powerSent}/${r.powerRequired} · Loot ${r.lootTotal}/${r.cap||0} · Injured ${r.injured}</div>
+          <div class="report-meta">${r.victory?`Fill ${Math.round((r.lootRatio||0)*100)}%`:'Repelled'}${r.victory?` · ${r.grade==='S'?'Perfect haul':r.grade==='A'?'Strong return':r.grade==='B'?'Solid return':r.grade==='C'?'Loose formation':'Wasteful raid'}`:''}</div>
+        </div>`).join('')}
+      </div>
+    </div>`:'';
+
   const combatLogHtml=G.combatLog.length?`
     <div class="section">
       <div class="section-title">ðŸ“œ Battle Reports</div>
@@ -1147,6 +1243,7 @@ function renderCombat(){
       <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-bottom:8px">Defeat NPC villages to steal resources, build control, then bring them under your banner as tributaries.</div>
       <div class="npc-list">${npcHtml}</div>
     </div>
+    ${raidReportHtml}
     ${combatLogHtml}`;
 }
 
@@ -1974,17 +2071,22 @@ function renderFaction(){
   const villageCards=governed.length?governed.map(farm=>{
     const state=getVillageState(farm.id);
     const options=villageFocusOptions(farm);
+    const trait=state.trait||'steward';
     return `<div class="village-card">
       <div class="village-card-top">
         <div>
           <div class="village-card-name">${farm.icon} ${farm.name}</div>
-          <div class="village-card-meta">${villageFocusLabel(state.focus||'balanced')} focus · ${villageTributeString(farm)}</div>
+          <div class="village-card-meta">${villageFocusLabel(state.focus||'balanced')} focus · ${governorTraitLabel(trait)} governor · ${villageTributeString(farm)}</div>
         </div>
         <div class="village-card-level">Lv ${farm.level}</div>
       </div>
       <div class="village-card-desc">${villageFocusDesc(state.focus||'balanced')}</div>
       <div class="village-focus-row">
         ${options.map(option=>`<button class="village-focus-btn ${state.focus===option?'active':''}" onclick="setVillageFocus('${farm.id}','${option}')">${villageFocusLabel(option)}</button>`).join('')}
+      </div>
+      <div class="village-card-desc" style="margin-top:8px">${governorTraitDesc(trait)}</div>
+      <div class="village-focus-row">
+        ${Object.entries(GOVERNOR_TRAITS).map(([id,def])=>`<button class="village-focus-btn ${trait===id?'active':''}" onclick="setVillageTrait('${farm.id}','${id}')">${def.label}</button>`).join('')}
       </div>
     </div>`;
   }).join(''):'';
@@ -2002,14 +2104,15 @@ function renderFaction(){
       <div class="ftrait"><div class="ftrait-name">Administration</div><div class="ftrait-desc">${governedVillageCount()} / ${currentAdminCap()} governed villages. Base capacity ${G.adminCap}, Citadel adds ${Math.floor(blvl('citadel')/2)}.</div></div>
       <div class="ftrait"><div class="ftrait-name">Tribute Flow</div><div class="ftrait-desc">${Object.keys(tribute).length?Object.entries(tribute).map(([k,v])=>`${G.resources[k]?.icon||k}${v.toFixed(1)}/m`).join(' · '):'No villages are paying tribute yet.'}</div></div>
       <div class="ftrait"><div class="ftrait-name">Governed Villages</div><div class="ftrait-desc">${governed.length?governed.map(f=>`${f.icon} ${f.name}`).join(' · '):'None yet. Win repeated raids to fill control, then crown the village from Combat.'}</div></div>
+      <div class="ftrait"><div class="ftrait-name">Governor Corps</div><div class="ftrait-desc">${governed.length?`Stewards boost tribute, Wardens add ${totalWardenWallBonus()} wall defence, and Quartermasters add ${Math.round(totalQuartermasterBonus()*100)}% raid carry capacity.`:'No governors assigned yet.'}</div></div>
       ${governed.length?`<div class="village-card-list">${villageCards}</div>`:''}
     </div>
 
     <div class="section">
       <div class="section-title">ðŸ›¡ Kingdom Defence</div>
       <div class="defence-card">
-        <div class="def-row"><span class="def-title">Wall Defence</span><span class="def-val">${G.wallDefence||0}</span></div>
-        <div class="def-bar"><div class="def-fill" style="width:${Math.min(100,((G.wallDefence||0)/500)*100)}%"></div></div>
+        <div class="def-row"><span class="def-title">Wall Defence</span><span class="def-val">${(G.wallDefence||0)+totalWardenWallBonus()}</span></div>
+        <div class="def-bar"><div class="def-fill" style="width:${Math.min(100,(((G.wallDefence||0)+totalWardenWallBonus())/500)*100)}%"></div></div>
         <div style="font-size:11px;color:var(--stone-light);margin-top:6px;font-style:italic">
           ${G.watchtowerUnlocked?'âœ“ Watchtower active â€” raid warnings enabled':'Build Citadel Lv2 to unlock Watchtower'}
         </div>
