@@ -56,6 +56,7 @@ const G={
   // ── UI FLAGS ──
   cityDirty:true,
   logDirty:true,
+  resourceForecastOpen:false,
   // ── KINGDOM IDENTITY ──
   kingdomName:'Arnethia',
   playerName:'',
@@ -78,8 +79,8 @@ function researchSpeedMultiplier(){
   return G.legacyRelics.includes('relic_research') ? (1/0.9) : 1;
 }
 
-const APP_VERSION = '0.7.1';
-const CACHE_VERSION = 'hc-v20';
+const APP_VERSION = '0.7.2';
+const CACHE_VERSION = 'hc-v21';
 
 // ── UPDATE CHECKER ──
 let _updateReloading=false;
@@ -1434,15 +1435,26 @@ function renderResources(){
           ${nearCap?`<span style="color:var(--blood-light)"> ⚠ Full</span>`:''}
         </div>
       </div>`;
-    }).join('');
+    }).join('')+
+    (G.resourceForecastOpen?renderResourceForecast():'');
 }
+
+let _lastResourceTap=0;
 
 function attachResourceCardClicks(){
   const el=document.getElementById('resource-grid');if(!el||el._resourceClicksAttached)return;
   el._resourceClicksAttached=true;
-  el.addEventListener('click',e=>{
-    if(e.target.closest('[data-resource-card]'))showResourceStorageTimes();
-  });
+  const onResourceTap=e=>{
+    if(!e.target.closest('[data-resource-card]'))return;
+    const now=Date.now();
+    if(now-_lastResourceTap<300)return;
+    _lastResourceTap=now;
+    e.preventDefault();
+    showResourceStorageTimes();
+  };
+  el.addEventListener('click',onResourceTap);
+  el.addEventListener('touchend',onResourceTap,{passive:false});
+  el.addEventListener('pointerup',onResourceTap);
   el.addEventListener('keydown',e=>{
     if(!e.target.closest('[data-resource-card]'))return;
     if(e.key==='Enter'||e.key===' '){e.preventDefault();showResourceStorageTimes();}
@@ -1473,9 +1485,24 @@ function resourceCapLine(key,r){
   return `${r.icon} ${r.name}: ${formatCapDuration((r.max-r.amount)/gain)} to max`;
 }
 
+function renderResourceForecast(){
+  return `<div class="resource-forecast">
+    <div class="resource-forecast-title">Storage Forecast</div>
+    ${Object.entries(G.resources).map(([k,r])=>{
+      const gain=effectiveResourceRate(k);
+      const status=r.amount>=r.max?'Full':gain<=0?'No gain':formatCapDuration((r.max-r.amount)/gain);
+      return `<div class="resource-forecast-row">
+        <span>${r.icon} ${r.name}</span>
+        <span>${status}</span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
 function showResourceStorageTimes(){
-  const lines=Object.entries(G.resources).map(([k,r])=>resourceCapLine(k,r));
-  showOverlay(lines.join('\n'),'success','Storage Forecast');
+  G.resourceForecastOpen=true;
+  renderResources();
+  showSnot('Storage forecast opened');
 }
 
 function renderBuildings(){
