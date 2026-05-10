@@ -100,8 +100,8 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '0.9.4';
-const CACHE_VERSION = 'hc-v34';
+const APP_VERSION = '0.9.5';
+const CACHE_VERSION = 'hc-v35';
 const RELIC_STACK_CAP = 5;
 
 const VILLAGE_FOCUS={
@@ -1607,7 +1607,7 @@ function buildBuilding(id){
   const bState=G.buildings.find(b=>b.id===id);
   if(!bDef||!bState)return;
   if(bState.level>=bDef.max)return;
-  if(!chkReq(bDef)){showSnot('Requirements not met');return;}
+  if(!chkReq(bDef)){showSnot(`Requires: ${buildingRequirementText(bDef)}`);return;}
   const nl=bState.level+1;
   let costs=bDef.cost(nl);
   if(G.costReduction)costs=Object.fromEntries(Object.entries(costs).map(([k,v])=>[k,Math.floor(v*G.costReduction)]));
@@ -1886,6 +1886,26 @@ function showResourceStorageTimes(){
   showSnot('Storage forecast is shown on each resource');
 }
 
+function buildingRequirementHtml(bDef){
+  if(!bDef.req)return '';
+  const parts=Object.entries(bDef.req).map(([id,level])=>{
+    const cur=blvl(id);
+    const met=cur>=level;
+    const name=BD.find(b=>b.id===id)?.name||id;
+    return `<span style="color:${met?'var(--forest-light)':'var(--blood-light)'}">${name} ${cur}/${level}</span>`;
+  });
+  return `<div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-bottom:4px">Requires: ${parts.join(' · ')}</div>`;
+}
+
+function buildingRequirementText(bDef){
+  if(!bDef.req)return '';
+  return Object.entries(bDef.req).map(([id,level])=>{
+    const cur=blvl(id);
+    const name=BD.find(b=>b.id===id)?.name||id;
+    return `${name} ${cur}/${level}`;
+  }).join(', ');
+}
+
 function renderBuildings(){
   const el=document.getElementById('building-list');if(!el)return;
   let html='';
@@ -1911,7 +1931,7 @@ function renderBuildings(){
       <div class="bheader"><span class="bname">${bDef.icon} ${bDef.name}</span><span class="blvl">Lv ${lvl}/${bDef.max}</span></div>
       <div class="bdesc">${bDef.desc}</div>
       ${lvl>0?`<div class="beff">${bDef.eff(lvl)}</div>`:''}
-      ${!req?'<div style="font-size:11px;color:var(--blood-light);font-style:italic;margin-bottom:4px">⚠ Requires prerequisites</div>':''}
+      ${!req?buildingRequirementHtml(bDef):''}
       <div class="bcosts">${cHtml}</div>
       ${!maxed?`<button class="bbtn" onclick="buildBuilding('${bDef.id}')" ${aff?'':'disabled'}>${lvl===0?'Construct':'Upgrade'} — Level ${nl}</button>`:''}
     </div>`;
@@ -1971,11 +1991,11 @@ function openBuildingPopup(id){
     }).join(' ');
   document.getElementById('bp-cost').innerHTML=maxed
     ?`<span style="color:var(--gold-dark)">Maximum level reached</span>`
-    :`Next level: ${costStr}`;
+    :`Next level: ${costStr}${!reqMet?`<div style="margin-top:6px">${buildingRequirementHtml(bDef)}</div>`:''}`;
 
   const btn=document.getElementById('bp-btn');
   if(maxed){btn.textContent='Maxed Out';btn.disabled=true;}
-  else if(!reqMet){btn.textContent='Requirements not met';btn.disabled=true;}
+  else if(!reqMet){btn.textContent=`Needs: ${buildingRequirementText(bDef)}`;btn.disabled=true;}
   else if(!affordable){btn.textContent='Need more resources';btn.disabled=true;}
   else{btn.textContent=`${lvl===0?'âš’ Construct':'âš’ Upgrade'} — Level ${nextLvl}`;btn.disabled=false;}
 
