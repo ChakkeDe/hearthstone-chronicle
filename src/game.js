@@ -78,8 +78,8 @@ function researchSpeedMultiplier(){
   return G.legacyRelics.includes('relic_research') ? (1/0.9) : 1;
 }
 
-const APP_VERSION = '0.7.5';
-const CACHE_VERSION = 'hc-v24';
+const APP_VERSION = '0.7.6';
+const CACHE_VERSION = 'hc-v25';
 
 // ── UPDATE CHECKER ──
 let _updateReloading=false;
@@ -837,7 +837,7 @@ function renderCombat(){
       ${t.training>0?`<div style="font-size:10px;color:var(--gold);font-style:italic;margin-bottom:4px">Training ${t.training}… ${minsLeft}m left</div>
         <div class="raid-progress"><div class="raid-progress-inner" style="width:${trainPct}%"></div></div>`:''}
       <div style="display:flex;gap:4px;margin-top:6px">
-        <input type="number" id="train-qty-${type}" min="1" max="999" value="10"
+        <input type="number" inputmode="numeric" pattern="[0-9]*" autocomplete="off" id="train-qty-${type}" min="1" max="999" value="10"
           style="width:50px;padding:4px;background:rgba(255,255,255,.04);border:1px solid rgba(201,168,76,.2);border-radius:3px;color:var(--parchment);font-size:11px;text-align:center;">
         <button class="train-btn" onclick="trainFromInput('${type}')" ${t.training>0?'disabled':''} style="flex:1">
           ${t.training>0?'Training…':'Train'}
@@ -902,7 +902,7 @@ function renderCombat(){
           ${Object.entries(TROOP_DEF).filter(([type])=>blvl('barracks')>=TROOP_DEF[type].reqBarracks&&type!=='siege').map(([type,def])=>`
             <div>
               <div class="send-label">${def.icon} ${def.name} (${G.troops[type].available})</div>
-              <input type="number" class="send-input" id="send-${farm.id}-${type}" min="0" max="${G.troops[type].available}" value="0" placeholder="0">
+              <input type="number" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="send-input" id="send-${farm.id}-${type}" min="0" max="${G.troops[type].available}" value="0" placeholder="0">
             </div>`).join('')}
         </div>
         <button class="attack-btn" onclick="launchAttack('${farm.id}')">⚔ Attack</button>
