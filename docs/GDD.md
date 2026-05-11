@@ -11,7 +11,7 @@
 
 ---
 
-# Core Vision
+## Core Vision
 
 Hearthstone Chronicles should feel like:
 
@@ -42,7 +42,7 @@ The biggest risk is:
 
 ---
 
-# Current State Assessment
+## Current State Assessment
 
 ## What Is Already Strong
 
@@ -89,7 +89,7 @@ Do NOT switch engines right now.
 
 ---
 
-# What The Game SHOULD Become
+## What The Game Should Become
 
 ## Target Experience
 
@@ -113,7 +113,7 @@ The game should create:
 - kingdom attachment
 - long-term goals
 - strategic planning
-- “one more upgrade” psychology
+- "one more upgrade" psychology
 
 NOT:
 
@@ -126,9 +126,9 @@ NOT:
 
 ---
 
-# Technology Direction
+## Technology Direction
 
-# KEEP
+### Keep
 
 ## Keep HTML/CSS/JS
 
@@ -159,9 +159,9 @@ Right now, migration would slow development dramatically.
 
 ---
 
-# Architecture Rules
+## Architecture Rules
 
-# SHOULD DO
+### Should Do
 
 ## 1. Modularize Carefully
 
@@ -240,7 +240,7 @@ Never hardcode balancing in gameplay logic.
 
 ---
 
-# Things You SHOULD NOT Do
+## Things You Should Not Do
 
 ## 1. Do Not Add Systems Too Fast
 
@@ -338,7 +338,7 @@ Codex should NOT:
 
 ---
 
-# Gameplay Pillars
+## Gameplay Pillars
 
 ## Pillar 1 — Kingdom Growth
 
@@ -389,9 +389,9 @@ The game must remain:
 
 ---
 
-# UI/UX Direction
+## UI/UX Direction
 
-## SHOULD DO
+### Should Do
 
 ### Prioritize Clarity
 
@@ -427,7 +427,7 @@ Examples:
 - blue = arcane
 - green = growth
 
-## SHOULD NOT DO
+### Should Not Do
 
 ### Avoid Tiny Text
 
@@ -443,9 +443,9 @@ Subtle animation > constant movement.
 
 ---
 
-# Audio Direction
+## Audio Direction
 
-## SHOULD DO
+### Should Do
 
 Eventually add:
 
@@ -454,7 +454,7 @@ Eventually add:
 - UI clicks
 - battle stingers
 
-## SHOULD NOT DO
+### Should Not Do
 
 Do NOT:
 
@@ -466,15 +466,15 @@ Audio should feel atmospheric.
 
 ---
 
-# Save System Rules
+## Save System Rules
 
-## CRITICAL
+### Critical
 
 Your save system is one of the most important systems.
 
 You already have good foundations.
 
-## SHOULD DO
+### Should Do
 
 ### Multiple Save Slots Eventually
 
@@ -505,7 +505,7 @@ Each save should contain:
 }
 ```
 
-## SHOULD NOT DO
+### Should Not Do
 
 ### Never Break Saves Casually
 
@@ -513,18 +513,18 @@ Players quit incremental games permanently when saves break.
 
 ---
 
-# Offline Progression Rules
+## Offline Progression Rules
 
 Offline progression is one of the core strengths.
 
-## SHOULD DO
+### Should Do
 
 - cap offline gains
 - prevent time exploits
 - show clear summaries
 - make offline progression meaningful
 
-## SHOULD NOT DO
+### Should Not Do
 
 - give infinite offline scaling
 - allow clock abuse
@@ -532,18 +532,18 @@ Offline progression is one of the core strengths.
 
 ---
 
-# PWA Direction
+## PWA Direction
 
 Your PWA direction is correct.
 
-## SHOULD DO
+### Should Do
 
 - maintain installability
 - keep offline support
 - maintain cache version discipline
 - support resume-from-background
 
-## SHOULD NOT DO
+### Should Not Do
 
 - aggressively cache stale builds
 - break update flow
@@ -551,7 +551,7 @@ Your PWA direction is correct.
 
 ---
 
-# Deployment Strategy
+## Deployment Strategy
 
 ## Immediate
 
@@ -571,9 +571,9 @@ Potential future deployment:
 
 ---
 
-# Content Expansion Priorities
+## Content Expansion Priorities
 
-# PRIORITY ORDER
+### Priority Order
 
 ## Priority 1 — Stabilization
 
@@ -617,7 +617,7 @@ Later add:
 
 ---
 
-# Things To Avoid Completely
+## Things To Avoid Completely
 
 ## Avoid Multiplayer
 
@@ -652,9 +652,9 @@ Keep the economy understandable.
 
 ---
 
-# Recommended Immediate Roadmap
+## Recommended Immediate Roadmap
 
-# PHASE 1 — FOUNDATION
+### Phase 1 - Foundation
 
 ## Goals
 
@@ -673,7 +673,7 @@ Keep the economy understandable.
 
 ---
 
-# PHASE 2 — POLISH
+### Phase 2 - Polish
 
 ## Goals
 
@@ -690,7 +690,7 @@ Keep the economy understandable.
 
 ---
 
-# PHASE 3 — DEPTH
+### Phase 3 - Depth
 
 ## Goals
 
@@ -706,7 +706,7 @@ Keep the economy understandable.
 
 ---
 
-# PHASE 4 — LONG-TERM CONTENT
+### Phase 4 - Long-Term Content
 
 ## Goals
 
@@ -722,9 +722,9 @@ Keep the economy understandable.
 
 ---
 
-# Codex Usage Rules
+## Codex Usage Rules
 
-## GOOD Codex Tasks
+### Good Codex Tasks
 
 ```text
 Refactor without changing gameplay.
@@ -746,7 +746,7 @@ Extract combat logic into modules.
 Audit save stability.
 ```
 
-## BAD Codex Tasks
+### Bad Codex Tasks
 
 ```text
 Rewrite the entire game.
@@ -766,7 +766,7 @@ Replace all systems.
 
 ---
 
-# Final Strategic Advice
+## Final Strategic Advice
 
 Your biggest opportunity is NOT becoming a massive AAA game.
 
@@ -792,4 +792,5 @@ The next stage is:
 Not uncontrolled expansion.
 
 That discipline is what separates promising projects from abandoned ones.
+
 
