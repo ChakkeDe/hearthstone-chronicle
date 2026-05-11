@@ -87,7 +87,7 @@ The app is designed for static hosting and works well on GitHub Pages.
 - `index.html` is the app entry point
 - `manifest.json` controls install metadata
 - `sw.js` and `version.json` drive update behavior
-- Player-visible updates should bump the version metadata and any cache keys used by the service worker flow
+- Player-visible updates should bump the version metadata and the service worker cache key together
 
 After deployment, give GitHub Pages a minute or two to publish before testing on mobile or in a PWA install.
 
@@ -150,8 +150,23 @@ Before merging a release-ready patch:
 3. Verify no dependencies or tooling layers were added unnecessarily
 4. Run syntax checks on changed scripts
 5. Test save/load, offline progress, and mobile readability
-6. Update version metadata when the release changes player-visible behavior
-7. Deploy to GitHub Pages and validate the live build
+6. If the release changes the app shell or any cached static asset:
+   - update `APP_VERSION` in `src/game.js` when the visible app version should change
+   - update `CACHE_VERSION` in `src/game.js`
+   - update the `app` and `cache` fields in `version.json`
+   - update `CACHE` in `sw.js`
+7. Confirm `CACHE_VERSION` in `src/game.js`, `cache` in `version.json`, and `CACHE` in `sw.js` all match exactly
+8. Confirm `sw.js` includes every required static shell asset, including:
+   - `src/save.js`
+   - manifest and icon files
+   - referenced static art in `assets/`
+9. Deploy to GitHub Pages
+10. Wait for the Pages publish to finish
+11. Open the live app and verify:
+   - the header version label matches the intended release
+   - **Check for Update** reports the latest version or offers the new build
+   - **Reload Latest Version** refreshes a stale client if needed
+12. Re-test the live PWA install on phone if the release changes cached UI or shell files
 
 ## Contributing Notes
 
