@@ -1,72 +1,43 @@
-\# Hearthstone Chronicles QA Checklist
+# Hearthstone Chronicles QA Checklist
 
+## Startup
 
+- [ ] Game loads
+- [ ] No console errors
+- [ ] Resources visible
 
-\## Startup
+## Buildings
 
-\- \[ ] Game loads
+- [ ] Upgrade works
+- [ ] Costs increase correctly
+- [ ] Production updates
 
-\- \[ ] No console errors
+## Research
 
-\- \[ ] Resources visible
+- [ ] Research starts
+- [ ] Research completes
+- [ ] Unlocks apply
 
+## Combat
 
+- [ ] Troops train
+- [ ] Raids resolve
+- [ ] Rewards granted
 
-\## Buildings
+## Save/Load
 
-\- \[ ] Upgrade works
+- [ ] Save persists refresh
+- [ ] Offline gains apply
+- [ ] No duplicate rewards
 
-\- \[ ] Costs increase correctly
+## Mobile
 
-\- \[ ] Production updates
+- [ ] UI readable
+- [ ] Buttons tappable
+- [ ] Tabs responsive
 
+## PWA
 
-
-\## Research
-
-\- \[ ] Research starts
-
-\- \[ ] Research completes
-
-\- \[ ] Unlocks apply
-
-
-
-\## Combat
-
-\- \[ ] Troops train
-
-\- \[ ] Raids resolve
-
-\- \[ ] Rewards granted
-
-
-
-\## Save/Load
-
-\- \[ ] Save persists refresh
-
-\- \[ ] Offline gains apply
-
-\- \[ ] No duplicate rewards
-
-
-
-\## Mobile
-
-\- \[ ] UI readable
-
-\- \[ ] Buttons tappable
-
-\- \[ ] Tabs responsive
-
-
-
-\## PWA
-
-\- \[ ] Install works
-
-\- \[ ] Update works
-
-\- \[ ] Cache refreshes
-
+- [ ] Install works
+- [ ] Update works
+- [ ] Cache refreshes
