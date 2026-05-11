@@ -104,8 +104,8 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '1.2.5';
-const CACHE_VERSION = 'hc-v47';
+const APP_VERSION = '1.2.6';
+const CACHE_VERSION = 'hc-v48';
 const RELIC_STACK_CAP = 5;
 
 const BASE_RESOURCE_MAX={gold:900,food:900,wood:900,stone:900,iron:600,mana:400};
@@ -1928,6 +1928,34 @@ function canAfford(costs){return Object.entries(costs).every(([r,a])=>G.resource
 function spend(costs){Object.entries(costs).forEach(([r,a])=>{G.resources[r].amount-=a;});}
 function blvl(id){return G.buildings.find(b=>b.id===id)?.level||0;}
 function chkReq(bDef){if(!bDef.req)return true;return Object.entries(bDef.req).every(([id,l])=>blvl(id)>=l);}
+
+// Temporary debug helper for investigating Stone Quarry income mismatches.
+function debugStoneIncome(){
+  const mineLevel=blvl('mine');
+  const mineState=G.buildings.find(b=>b.id==='mine')||null;
+  const quarryDef=BD.find(b=>b.id==='mine')||null;
+  const stonemasonsCompleted=!!G.research?.stonemasons?.completed;
+  const totalBuildingLevels=G.buildings.reduce((sum,b)=>sum+(b.level||0),0);
+  const snapshot={
+    appVersion:APP_VERSION,
+    cacheVersion:CACHE_VERSION,
+    stoneAmount:G.resources?.stone?.amount ?? null,
+    stoneRate:G.resources?.stone?.rate ?? null,
+    effectiveStoneRate:effectiveResourceRate('stone'),
+    earlyBoost:earlyBoost(),
+    mineLevel,
+    mineBuildingState:mineState,
+    stoneQuarryDefinition:quarryDef,
+    mineRateBonus:BUILDING_RATE_BONUS.mine||null,
+    stonemasonsCompleted,
+    totalBuildingLevels
+  };
+  console.group('debugStoneIncome');
+  console.log('Stone income snapshot',snapshot);
+  console.groupEnd();
+  return snapshot;
+}
+window.debugStoneIncome=debugStoneIncome;
 
 // ==== INIT ====
 function init(){
