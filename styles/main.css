@@ -425,6 +425,10 @@ body::before{content:'';position:fixed;inset:0;
 .toggle.on::after{transform:translateX(16px);background:var(--forest-light);}
 .toggle-label{font-size:11px;color:var(--stone-light);}
 .threshold-row{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;color:var(--stone-light);}
+.garrison-grid{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+.garrison-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:var(--parchment);}
+.garrison-controls{display:flex;gap:6px;}
+.garrison-controls .train-btn{width:auto;min-width:44px;padding-inline:8px;}
 
 .village-card-list{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
 .village-card{background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.14);border-radius:4px;padding:10px;}

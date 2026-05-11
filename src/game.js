@@ -103,16 +103,16 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '1.0.0';
-const CACHE_VERSION = 'hc-v39';
+const APP_VERSION = '1.1.0';
+const CACHE_VERSION = 'hc-v40';
 const RELIC_STACK_CAP = 5;
 
 const BASE_RESOURCE_MAX={gold:500,food:500,wood:500,stone:500,iron:300,mana:200};
 
 const MANA_ABILITIES=[
-  {id:'harvest',name:'Harvest Blessing',icon:'✨',cost:40,duration:600,desc:'+50% resource income for 10 minutes.'},
-  {id:'battle',name:'Battle Hymn',icon:'⚔',cost:55,duration:900,desc:'+25% army power for 15 minutes.'},
-  {id:'ward',name:'Ley Ward',icon:'🛡',cost:35,duration:900,desc:'-25% raid injuries for 15 minutes.'},
+  {id:'harvest',name:'Harvest Blessing',icon:'✨',cost:110,duration:600,desc:'+50% resource income for 10 minutes.'},
+  {id:'battle',name:'Battle Hymn',icon:'⚔',cost:145,duration:900,desc:'+25% army power for 15 minutes.'},
+  {id:'ward',name:'Ley Ward',icon:'🛡',cost:90,duration:900,desc:'-25% raid injuries for 15 minutes.'},
 ];
 
 const VILLAGE_FOCUS={
@@ -482,11 +482,12 @@ function endSeason(){
   if(G.seasonComplete)return;
   G.seasonComplete=true;
   const path=VICTORY_PATHS[G.victoryPath];
-  const finalPrestige=Math.floor(G.prestige*(1+(G.victoryBonus/100)));
+  const finalPrestige=Math.floor(G.prestige*(1+(G.victoryBonus/100)))+strongholdSeasonRenown();
   showSeasonEndScreen(finalPrestige, path);
 }
 
 function showSeasonEndScreen(finalPrestige, path){
+  const frontierRenown=strongholdSeasonRenown();
   const existing=document.getElementById('season-overlay');
   if(existing)existing.remove();
   const overlay=document.createElement('div');
@@ -554,6 +555,20 @@ function beginNewDynasty(){
   G.prestige=0;
   G.prestigePoints=0;
   G.prestigeGoal+=250;
+  G.npcFarms.forEach(farm=>{
+    const state=getVillageState(farm.id);
+    if(isFrontierTarget(farm)){
+      Object.entries(state.garrison||{}).forEach(([type,qty])=>{
+        if(qty>0&&G.troops[type])G.troops[type].available+=qty;
+      });
+      state.captured=false;
+      state.control=0;
+      state.defenseWins=0;
+      state.garrison={infantry:0,archers:0,cavalry:0};
+      farm.available=true;
+      farm.respawnAt=0;
+    }
+  });
 
   if(_selectedRelic==='relic_gold') G.resources.gold.rate+=2;
   if(_selectedRelic==='relic_combat') G.heroes.forEach(h=>h.power=Math.round(h.power*1.15));
@@ -855,14 +870,43 @@ function calcLootCapacity(sent){
 }
 
 function farmLootTotal(farm){
-  return Object.values(farm.loot||{}).reduce((sum,val)=>sum+val,0);
+  return Object.values(scaledFarmLoot(farm)).reduce((sum,val)=>sum+val,0);
 }
 
 function getVillageState(farmId){
   if(!G.governedVillages[farmId]){
-    G.governedVillages[farmId]={control:0,victories:0,governed:false,focus:'balanced',trait:'steward'};
+    G.governedVillages[farmId]={control:0,victories:0,governed:false,captured:false,defenseWins:0,focus:'balanced',trait:'steward',garrison:{infantry:0,archers:0,cavalry:0}};
   }
+  if(G.governedVillages[farmId].captured==null)G.governedVillages[farmId].captured=false;
+  if(G.governedVillages[farmId].defenseWins==null)G.governedVillages[farmId].defenseWins=0;
+  if(!G.governedVillages[farmId].garrison)G.governedVillages[farmId].garrison={infantry:0,archers:0,cavalry:0};
   return G.governedVillages[farmId];
+}
+
+function isStronghold(farm){
+  return farm?.kind==='stronghold';
+}
+
+function isOrcHorde(farm){
+  return farm?.kind==='horde';
+}
+
+function isFrontierTarget(farm){
+  return isStronghold(farm)||isOrcHorde(farm);
+}
+
+function scaledFarmLoot(farm){
+  if(!farm?.lootScale)return farm?.loot||{};
+  const loot={};
+  Object.entries(farm.lootScale).forEach(([key,pct])=>{
+    loot[key]=Math.max(1,Math.floor((G.resources[key]?.max||0)*pct));
+  });
+  return loot;
+}
+
+function canSeeFarm(farm){
+  if(isOrcHorde(farm))return orcHordeUnlocked();
+  return true;
 }
 
 function currentAdminCap(){
@@ -871,6 +915,27 @@ function currentAdminCap(){
 
 function governedVillageCount(){
   return Object.values(G.governedVillages||{}).filter(v=>v.governed).length;
+}
+
+function capturedStrongholds(){
+  return G.npcFarms.filter(f=>isStronghold(f)&&getVillageState(f.id).captured);
+}
+
+function strongholdSeasonRenown(){
+  return G.npcFarms.reduce((sum,farm)=>{
+    const state=getVillageState(farm.id);
+    if(isStronghold(farm)&&state.captured)return sum+(farm.seasonalRenown||0);
+    if(isOrcHorde(farm)&&state.captured)return sum+(farm.seasonalRenown||0);
+    return sum;
+  },0);
+}
+
+function orcHordeUnlocked(){
+  const strongholds=G.npcFarms.filter(isStronghold);
+  return strongholds.length>0&&strongholds.every(f=>{
+    const state=getVillageState(f.id);
+    return state.captured&&state.defenseWins>=3;
+  });
 }
 
 function villageTributeMultiplier(){
@@ -906,6 +971,7 @@ function totalWardenWallBonus(){
 }
 
 function villageTributePerMinute(farm){
+  if(isFrontierTarget(farm))return {};
   const tribute={};
   const state=getVillageState(farm.id);
   const focus=state.focus||'balanced';
@@ -934,7 +1000,7 @@ function addVillageControl(farmId, amount){
   const farm=G.npcFarms.find(f=>f.id===farmId);
   if(!farm)return;
   const state=getVillageState(farmId);
-  if(state.governed)return;
+  if(state.governed||state.captured)return;
   const before=state.control||0;
   state.victories=(state.victories||0)+1;
   state.control=Math.min(farm.controlNeed||100, before+amount);
@@ -971,6 +1037,7 @@ function applyVillageTribute(minutes){
 
 function canGovernVillage(farm){
   const state=getVillageState(farm.id);
+  if(isFrontierTarget(farm))return false;
   return !state.governed&&(state.control||0)>=(farm.controlNeed||100)&&governedVillageCount()<currentAdminCap();
 }
 
@@ -1012,6 +1079,75 @@ function setVillageTrait(farmId, trait){
   if(state.trait===trait)return;
   state.trait=trait;
   addLog(`${farm.name} now follows a ${governorTraitLabel(trait)} governor.`,'important');
+  renderAll();
+  saveGame();
+}
+
+function adjustCityGarrison(type,delta){
+  if(delta>0){
+    const move=Math.min(delta,G.troops[type]?.available||0);
+    if(move<=0){showSnot(`No ${TROOP_DEF[type]?.name||type} available`);return;}
+    G.troops[type].available-=move;
+    G.garrison[type]=(G.garrison[type]||0)+move;
+  }else{
+    const move=Math.min(Math.abs(delta),G.garrison[type]||0);
+    if(move<=0)return;
+    G.garrison[type]-=move;
+    G.troops[type].available+=move;
+  }
+  renderAll();
+  saveGame();
+}
+
+function canCaptureFrontier(farm){
+  const state=getVillageState(farm.id);
+  if(!isFrontierTarget(farm)||state.captured)return false;
+  if((state.control||0)<(farm.controlNeed||100))return false;
+  if(isStronghold(farm))return G.seasonWeek>=(farm.captureWeek||1);
+  if(isOrcHorde(farm))return orcHordeUnlocked();
+  return false;
+}
+
+function captureFrontier(farmId){
+  const farm=G.npcFarms.find(f=>f.id===farmId);
+  if(!farm||!isFrontierTarget(farm))return;
+  const state=getVillageState(farmId);
+  if(!canCaptureFrontier(farm)){
+    if(isStronghold(farm)&&G.seasonWeek<(farm.captureWeek||1))showSnot(`Capture unlocks in week ${farm.captureWeek}`);
+    else if(isOrcHorde(farm)&&!orcHordeUnlocked())showSnot('Hold and defend all strongholds three times first');
+    else showSnot('Win more raids to establish control');
+    return;
+  }
+  state.captured=true;
+  state.defenseWins=state.defenseWins||0;
+  addLog(`${farm.name} is captured and now must be held against the frontier.`,'important');
+  showOverlay(`${farm.name}\nFrontier stronghold captured. Station troops to hold it.`,'success','Stronghold Captured');
+  renderAll();
+  saveGame();
+}
+
+function strongholdGarrisonPower(state){
+  const g=state.garrison||{};
+  return Object.entries(g).reduce((sum,[type,qty])=>sum+((TROOP_DEF[type]?.atk||0)*qty),0);
+}
+
+function adjustStrongholdGarrison(farmId,type,delta){
+  const farm=G.npcFarms.find(f=>f.id===farmId);
+  if(!farm||!isFrontierTarget(farm))return;
+  const state=getVillageState(farmId);
+  if(!state.captured){showSnot('Capture the frontier site first');return;}
+  if(!state.garrison)state.garrison={infantry:0,archers:0,cavalry:0};
+  if(delta>0){
+    const move=Math.min(delta,G.troops[type]?.available||0);
+    if(move<=0){showSnot(`No ${TROOP_DEF[type]?.name||type} available`);return;}
+    G.troops[type].available-=move;
+    state.garrison[type]+=move;
+  }else{
+    const move=Math.min(Math.abs(delta),state.garrison[type]||0);
+    if(move<=0)return;
+    state.garrison[type]-=move;
+    G.troops[type].available+=move;
+  }
   renderAll();
   saveGame();
 }
@@ -1066,7 +1202,8 @@ function addRaidReport(report){
 
 function attackNPC(farmId,sent){
   const farm=G.npcFarms.find(f=>f.id===farmId);
-  if(!farm||!farm.available){showSnot('Target not available');return;}
+  if(!farm||!canSeeFarm(farm)){showSnot('Target not available');return;}
+  if(!farm.available){showSnot('Target not available');return;}
   const totalSent=Object.values(sent).reduce((a,b)=>a+b,0);
   if(totalSent===0){showSnot('Select troops to send');return;}
 
@@ -1098,14 +1235,15 @@ function resolveRaid(raid){
   const atkPow=calcAttackPower(raid.sent);
   const farm=raid.farm;
   const victory=atkPow>=farm.def;
+  const farmLoot=scaledFarmLoot(farm);
 
   if(victory){
     // Loot calculation
     const cap=calcLootCapacity(raid.sent);
-    let lootTotal=Object.values(farm.loot).reduce((a,b)=>a+b,0);
+    let lootTotal=Object.values(farmLoot).reduce((a,b)=>a+b,0);
     const lootRatio=Math.min(1,cap/lootTotal);
     const loot={};
-    Object.entries(farm.loot).forEach(([res,amt])=>{
+    Object.entries(farmLoot).forEach(([res,amt])=>{
       loot[res]=Math.floor(amt*lootRatio);
       if(G.resources[res])G.resources[res].amount=Math.min(G.resources[res].max,G.resources[res].amount+loot[res]);
     });
@@ -1139,7 +1277,7 @@ function resolveRaid(raid){
       time:`Yr.${G.year}`,
     });
     G.prestige+=10;
-    addVillageControl(farm.id, Math.max(20, 35+(farm.level*5)));
+    addVillageControl(farm.id, isFrontierTarget(farm)?Math.max(25,30+(farm.level*8)):Math.max(20,35+(farm.level*5)));
     if(totalInjured>0) recoverInjured(totalInjured);
 
   } else {
@@ -1206,6 +1344,57 @@ function checkNPCRespawn(){
   });
 }
 
+function resolveFrontierPressure(){
+  const captured=capturedStrongholds();
+  if(captured.length){
+    captured.forEach(farm=>{
+      const state=getVillageState(farm.id);
+      const defendPower=strongholdGarrisonPower(state);
+      const attackPower=Math.floor(farm.def*(0.72+(state.defenseWins*0.08)));
+      if(defendPower>=attackPower){
+        state.defenseWins=Math.min(3,(state.defenseWins||0)+1);
+        const attrition=Math.max(1,Math.floor(Object.values(state.garrison||{}).reduce((s,v)=>s+v,0)*0.08));
+        let remaining=attrition;
+        ['infantry','archers','cavalry'].forEach(type=>{
+          const loss=Math.min(state.garrison[type]||0,remaining);
+          state.garrison[type]-=loss;
+          G.troops[type].injured+=loss;
+          remaining-=loss;
+        });
+        addLog(`${farm.name} repelled an Orc assault. Defence count: ${state.defenseWins}/3.`,'important');
+      }else{
+        Object.entries(state.garrison||{}).forEach(([type,qty])=>{
+          if(qty>0)G.troops[type].injured+=qty;
+        });
+        state.garrison={infantry:0,archers:0,cavalry:0};
+        state.captured=false;
+        state.control=Math.max(0,(farm.controlNeed||100)-40);
+        addLog(`${farm.name} was overrun by frontier forces and falls back out of your control.`,'danger');
+        showOverlay(`${farm.name}\nLost to an Orc counterattack.`, 'danger', 'Stronghold Lost');
+      }
+    });
+  }
+  if(captured.length>=2){
+    const cityDef=(G.wallDefence||0)+totalWardenWallBonus()+Object.entries(G.garrison||{}).reduce((s,[type,qty])=>s+((TROOP_DEF[type]?.atk||0)*qty),0);
+    const cityAtk=350+(captured.length*180);
+    if(cityDef<cityAtk){
+      const stolen={};
+      ['gold','food','wood','stone','iron'].forEach(key=>{
+        const loss=Math.floor((G.resources[key].amount||0)*0.08);
+        if(loss>0){
+          G.resources[key].amount=Math.max(0,G.resources[key].amount-loss);
+          stolen[key]=loss;
+        }
+      });
+      const lootText=Object.entries(stolen).map(([k,v])=>`${G.resources[k].icon}${v}`).join(' ');
+      addLog(`Orc raiders struck Arnethia while the frontier was stretched thin. Lost ${lootText}.`,'danger');
+      showOverlay(`Your city was raided.\nLost ${lootText||'supplies'}.`,'danger','City Raided');
+    }else{
+      addLog('Watchtowers spot an Orc raid, but the walls and garrison hold firm.','important');
+    }
+  }
+}
+
 // â”€â”€ RENDER COMBAT â”€â”€
 function renderCombat(){
   const tab=document.getElementById('tab-combat');if(!tab)return;
@@ -1263,7 +1452,7 @@ function renderCombat(){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <span style="font-family:'Cinzel',serif;font-size:11px;color:var(--forest-light)">🏥 Hospital</span>
       <span style="font-size:10px;color:var(--stone-light)">${hospitalLvl===0?'Not built':
-        `Capacity: ${50+hospitalLvl*50}`}</span>
+        `Capacity: ${150+hospitalLvl*150}`}</span>
     </div>
     ${G.hospital.recovering>0?
       `<div style="font-size:11px;color:var(--forest-light)">${G.hospital.recovering} troops recovering…
@@ -1304,17 +1493,21 @@ function renderCombat(){
       }).join('')}
     </div>`:'';
 
-  const npcHtml=G.npcFarms.map(farm=>{
+  const npcHtml=G.npcFarms.filter(canSeeFarm).map(farm=>{
     const state=getVillageState(farm.id);
     const af=G.autoFarm[farm.id]||{enabled:false,floor:20};
     const hasRaidHistory=G.combatLog.some(e=>e.msg.includes(farm.name)&&e.type==='victory');
     const activeRaid=G.activeRaids.find(r=>r.farmId===farm.id);
-    const lootStr=Object.entries(farm.loot).map(([r,v])=>`${G.resources[r]?.icon||r}${v}`).join(' ');
+    const lootStr=Object.entries(scaledFarmLoot(farm)).map(([r,v])=>`${G.resources[r]?.icon||r}${v}`).join(' ');
     const minsToRespawn=farm.available?0:Math.ceil((farm.respawnAt-G.tick)/60);
     const canBeat=readyPower>=farm.def;
     const controlNeed=farm.controlNeed||100;
     const controlPct=Math.min(100,Math.round(((state.control||0)/controlNeed)*100));
     const canGovern=canGovernVillage(farm);
+    const canCapture=canCaptureFrontier(farm);
+    const isCapturedFrontier=isFrontierTarget(farm)&&state.captured;
+    const garrison=state.garrison||{infantry:0,archers:0,cavalry:0};
+    const garrisonText=Object.entries(garrison).filter(([,v])=>v>0).map(([k,v])=>`${TROOP_DEF[k]?.icon||k}${v}`).join(' ')||'No garrison';
     const autoControls=`<div class="autofarm-row">
           <div class="toggle-wrap">
             <div class="toggle ${af.enabled?'on':''}" onclick="toggleAutoFarm('${farm.id}')"></div>
@@ -1332,25 +1525,58 @@ function renderCombat(){
         ${af.enabled&&activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Auto-farm will stop after the current raid returns.</div>`:''}
         ${af.enabled&&!farm.available&&!activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Auto-farm is armed and waiting for this target to reopen.</div>`:''}
         ${!hasRaidHistory&&!af.enabled&&!activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Win one raid here to unlock auto-farm.</div>`:''}`;
+    const frontierStatus=isStronghold(farm)
+      ?(state.captured
+        ?`Captured · Defence ${state.defenseWins||0}/3 · Garrison ${garrisonText}`
+        :(G.seasonWeek<(farm.captureWeek||1)
+          ?`Frontier raid site · Capture unlocks in week ${farm.captureWeek}`
+          :`Control ${Math.floor(state.control||0)}/${controlNeed} · Capture ready once control is filled`))
+      :(isOrcHorde(farm)
+        ?(state.captured
+          ?'Orc Horde broken · Multiplayer transfer route secured'
+          :(orcHordeUnlocked()
+            ?`Horde exposed · Control ${Math.floor(state.control||0)}/${controlNeed}`
+            :'Hold all strongholds and defend each 3 times to reveal the Horde'))
+        :'');
+const frontierButtons=isCapturedFrontier?`
+        <div style="font-size:10px;color:var(--stone-light);margin-top:8px;font-style:italic">Garrison troops to hold this frontier site. If it falls, Orcs can push deeper into your lands.</div>
+        <div class="garrison-grid">
+          ${['infantry','archers','cavalry'].map(type=>`
+            <div class="garrison-row">
+              <span>${TROOP_DEF[type].icon} ${garrison[type]||0}</span>
+              <div class="garrison-controls">
+                <button class="train-btn" onclick="adjustStrongholdGarrison('${farm.id}','${type}',10)">+10</button>
+                <button class="train-btn" onclick="adjustStrongholdGarrison('${farm.id}','${type}',-10)">-10</button>
+              </div>
+            </div>`).join('')}
+        </div>`:'';
+    const actionButtons=canGovern
+      ?`<button class="attack-btn" style="margin-top:8px;background:rgba(74,122,50,.14);border-color:rgba(74,122,50,.35);color:var(--forest-light)" onclick="governVillage('${farm.id}')">Crown as Tributary</button>`
+      :canCapture
+        ?`<button class="attack-btn" style="margin-top:8px;background:rgba(74,122,50,.14);border-color:rgba(74,122,50,.35);color:var(--forest-light)" onclick="captureFrontier('${farm.id}')">${isOrcHorde(farm)?'Break the Orc Horde':'Capture Stronghold'}</button>`
+        :((state.control||0)>=controlNeed&&governedVillageCount()>=currentAdminCap()&&!isFrontierTarget(farm))
+          ?`<div style="font-size:10px;color:var(--blood-light);margin-top:8px;font-style:italic">Administration full (${governedVillageCount()}/${currentAdminCap()}). Raise Citadel or advance a dynasty.</div>`
+          :'';
     return`<div class="npc-card ${farm.available?'':''}">
       <div class="npc-header">
         <span class="npc-name">${farm.icon} ${farm.name}</span>
         <span class="npc-level">Lv ${farm.level}</span>
       </div>
       <div class="npc-loot">Loot: ${lootStr}</div>
-      <div style="font-size:10px;color:${state.governed?'var(--forest-light)':'var(--stone-light)'};margin-bottom:6px">
-        ${state.governed?`Governed · ${villageFocusLabel(state.focus||'balanced')} focus · Passive tribute ${villageTributeString(farm,true)}`:`Control ${Math.floor(state.control||0)}/${controlNeed} · ${state.victories||0} victories`}
+      <div style="font-size:10px;color:${state.governed||isCapturedFrontier?'var(--forest-light)':'var(--stone-light)'};margin-bottom:6px">
+        ${state.governed?`Governed · ${villageFocusLabel(state.focus||'balanced')} focus · Passive tribute ${villageTributeString(farm,true)}`:(isFrontierTarget(farm)?frontierStatus:`Control ${Math.floor(state.control||0)}/${controlNeed} · ${state.victories||0} victories`)}
       </div>
-      <div class="raid-progress" style="margin-bottom:6px"><div class="raid-progress-inner" style="width:${controlPct}%;background:${state.governed?'linear-gradient(90deg,var(--forest-light),var(--gold))':'linear-gradient(90deg,var(--blood-light),var(--gold))'}"></div></div>
+      <div class="raid-progress" style="margin-bottom:6px"><div class="raid-progress-inner" style="width:${isCapturedFrontier?100:controlPct}%;background:${state.governed||isCapturedFrontier?'linear-gradient(90deg,var(--forest-light),var(--gold))':'linear-gradient(90deg,var(--blood-light),var(--gold))'}"></div></div>
       <div class="npc-power-row">
         <span>Required: ${farm.def}</span>
         <span class="${canBeat?'ok':'low'}">Available power: ${readyPower}</span>
       </div>
       ${state.governed?
         `<div style="font-size:11px;color:var(--forest-light);font-style:italic">Tributary secured. No further raids needed.</div>`:
+        isCapturedFrontier?`${frontierButtons}`:
         !farm.available?
         `<div style="font-size:11px;color:var(--stone-light);font-style:italic">Respawns in ${minsToRespawn}m</div>
-        ${autoControls}`
+        ${isFrontierTarget(farm)?'':autoControls}`
         :`<div style="font-size:10px;color:var(--gold-dark);margin-bottom:6px;font-family:'Cinzel',serif">Send troops:</div>
         <div class="troop-send">
           ${Object.entries(TROOP_DEF).filter(([type])=>blvl('barracks')>=TROOP_DEF[type].reqBarracks&&type!=='siege').map(([type,def])=>`
@@ -1360,9 +1586,8 @@ function renderCombat(){
             </div>`).join('')}
         </div>
         <button class="attack-btn" onclick="launchAttack('${farm.id}')">⚔ Attack</button>
-        ${autoControls}
-        ${canGovern?`<button class="attack-btn" style="margin-top:8px;background:rgba(74,122,50,.14);border-color:rgba(74,122,50,.35);color:var(--forest-light)" onclick="governVillage('${farm.id}')">Crown as Tributary</button>`:
-          ((state.control||0)>=controlNeed&&governedVillageCount()>=currentAdminCap())?`<div style="font-size:10px;color:var(--blood-light);margin-top:8px;font-style:italic">Administration full (${governedVillageCount()}/${currentAdminCap()}). Raise Citadel or advance a dynasty.</div>`:''}
+        ${isFrontierTarget(farm)?'':autoControls}
+        ${actionButtons}
         `}
     </div>`;
   }).join('');
@@ -1714,6 +1939,7 @@ function gameTick(){
   // Secondary iron from quarry — 0.2/min per mine level
   const mineLvl=blvl('mine');
   if(mineLvl>0&&G.tick%60===0) G.resources.iron.amount=Math.min(G.resources.iron.max, G.resources.iron.amount+(mineLvl*0.2));
+  if(G.tick%480===0)resolveFrontierPressure();
   if(G.tick%300===0){G.year++;addLog(`Year ${G.year} of the ${G.era}. The kingdom endures.`);}
   if(G.activeResearch){
     G.researchProgress+=researchSpeedMultiplier();
@@ -2365,6 +2591,8 @@ function renderFaction(){
   const governed=G.npcFarms.filter(f=>getVillageState(f.id).governed);
   const assignedArmyHeroes=G.heroes.filter(h=>h.assignment==='army');
   const activeManaBuffs=MANA_ABILITIES.filter(a=>isManaBuffActive(a.id));
+  const strongholds=G.npcFarms.filter(isStronghold);
+  const capturedSites=capturedStrongholds();
   const villageCards=governed.length?governed.map(farm=>{
     const state=getVillageState(farm.id);
     const options=villageFocusOptions(farm);
@@ -2406,6 +2634,13 @@ function renderFaction(){
     </div>
 
     <div class="section">
+      <div class="section-title">🛡 Frontier War</div>
+      <div class="ftrait"><div class="ftrait-name">Strongholds Held</div><div class="ftrait-desc">${capturedSites.length}/${strongholds.length} strongholds captured. End-of-season renown from frontier: ${strongholdSeasonRenown()}.</div></div>
+      <div class="ftrait"><div class="ftrait-name">Orc Horde Gate</div><div class="ftrait-desc">${orcHordeUnlocked()?'The Orc Horde is exposed. Break it to secure the multiplayer transfer route.':'Capture all three strongholds and successfully defend each of them three times to reveal the Orc Horde.'}</div></div>
+      <div class="ftrait"><div class="ftrait-name">Frontier Risk</div><div class="ftrait-desc">${capturedSites.length>=2?'Your expanding frontier is provoking Orc retaliation against both strongholds and the capital.':'Holding more frontier territory will draw stronger Orc retaliation.'}</div></div>
+    </div>
+
+    <div class="section">
       <div class="section-title">🛡 Kingdom Defence</div>
       <div class="defence-card">
         <div class="def-row"><span class="def-title">Wall Defence</span><span class="def-val">${(G.wallDefence||0)+totalWardenWallBonus()}</span></div>
@@ -2415,6 +2650,16 @@ function renderFaction(){
         </div>
         <div style="font-size:11px;color:var(--stone-light);margin-top:4px;font-style:italic">
           Garrison: ${Object.entries(G.garrison||{}).filter(([,v])=>v>0).map(([k,v])=>`${TROOP_DEF[k]?.icon||k}${v}`).join(' ')||'None assigned'}
+        </div>
+        <div class="garrison-grid" style="margin-top:8px">
+          ${['infantry','archers','cavalry'].map(type=>`
+            <div class="garrison-row">
+              <span>${TROOP_DEF[type].icon} ${G.garrison[type]||0}</span>
+              <div class="garrison-controls">
+                <button class="train-btn" onclick="adjustCityGarrison('${type}',10)">+10</button>
+                <button class="train-btn" onclick="adjustCityGarrison('${type}',-10)">-10</button>
+              </div>
+            </div>`).join('')}
         </div>
       </div>
     </div>
