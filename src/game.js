@@ -60,6 +60,7 @@ const G={
   researchProgress2:0,
   // â”€â”€ STORAGE â”€â”€
   storageLevels:{granary:0,vault:0,timberyard:0,armoury:0,manawell:0},
+  manaBuffs:{harvestEnd:0,battleEnd:0,wardEnd:0},
   // â”€â”€ UI FLAGS â”€â”€
   cityDirty:true,
   logDirty:true,
@@ -102,9 +103,17 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '0.9.8';
-const CACHE_VERSION = 'hc-v38';
+const APP_VERSION = '1.0.0';
+const CACHE_VERSION = 'hc-v39';
 const RELIC_STACK_CAP = 5;
+
+const BASE_RESOURCE_MAX={gold:500,food:500,wood:500,stone:500,iron:300,mana:200};
+
+const MANA_ABILITIES=[
+  {id:'harvest',name:'Harvest Blessing',icon:'✨',cost:40,duration:600,desc:'+50% resource income for 10 minutes.'},
+  {id:'battle',name:'Battle Hymn',icon:'⚔',cost:55,duration:900,desc:'+25% army power for 15 minutes.'},
+  {id:'ward',name:'Ley Ward',icon:'🛡',cost:35,duration:900,desc:'-25% raid injuries for 15 minutes.'},
+];
 
 const VILLAGE_FOCUS={
   balanced:{label:'Balanced',desc:'Keep tribute steady across all outputs.'},
@@ -630,7 +639,7 @@ function buildSavePayload(){
     raidReports:G.raidReports,
     wallDefence:G.wallDefence,garrison:G.garrison,watchtowerUnlocked:G.watchtowerUnlocked,
     warChest:G.warChest,warChestCap:G.warChestCap,warChestWeeklyConverted:G.warChestWeeklyConverted,
-    lastWarChestDecay:G.lastWarChestDecay,storageLevels:G.storageLevels,
+    lastWarChestDecay:G.lastWarChestDecay,storageLevels:G.storageLevels,manaBuffs:G.manaBuffs,
     supabaseUrl:G.supabaseUrl,supabaseKey:G.supabaseKey,
     log:G.log.slice(0,20),
   };
@@ -678,9 +687,11 @@ function applyLoadedState(s){
   if(s.warChestWeeklyConverted!=null)G.warChestWeeklyConverted=s.warChestWeeklyConverted;
   if(s.lastWarChestDecay)G.lastWarChestDecay=s.lastWarChestDecay;
   if(s.storageLevels)Object.assign(G.storageLevels,s.storageLevels);
+  if(s.manaBuffs)Object.assign(G.manaBuffs,s.manaBuffs);
   if(s.supabaseUrl)G.supabaseUrl=s.supabaseUrl;
   if(s.supabaseKey)G.supabaseKey=s.supabaseKey;
   G.log=s.log||G.log;
+  normalizeDerivedBuildingState();
 }
 
 // Cost helper — cheap early levels, steeper later. Base * 1.65^(level-1)
@@ -702,8 +713,82 @@ function mergeSavedNpcFarms(savedFarms){
   }));
 }
 
+function expectedStorageCaps(){
+  const citadelLvl=blvl('citadel');
+  return {
+    gold:BASE_RESOURCE_MAX.gold+(citadelLvl*450)+(blvl('vault')*300),
+    food:BASE_RESOURCE_MAX.food+(citadelLvl*450)+(blvl('granary')*300),
+    wood:BASE_RESOURCE_MAX.wood+(citadelLvl*450)+(blvl('timberyard')*300),
+    stone:BASE_RESOURCE_MAX.stone+(citadelLvl*450),
+    iron:BASE_RESOURCE_MAX.iron+(citadelLvl*450)+(blvl('armoury')*250),
+    mana:BASE_RESOURCE_MAX.mana+(citadelLvl*450)+(blvl('manawell')*250),
+  };
+}
+
+function normalizeDerivedBuildingState(){
+  const caps=expectedStorageCaps();
+  Object.entries(caps).forEach(([key,val])=>{
+    if(G.resources[key])G.resources[key].max=Math.max(G.resources[key].max,val);
+  });
+  const hospitalLvl=blvl('hospital');
+  if(hospitalLvl>0){
+    G.hospital.capacity=Math.max(G.hospital.capacity,150+(hospitalLvl*150));
+  }
+}
+
 function initCombat(){
   G.npcFarms=NPC_FARMS.map(f=>({...f}));
+}
+
+function isManaBuffActive(id){
+  const key=`${id}End`;
+  return (G.manaBuffs?.[key]||0)>G.tick;
+}
+
+function manaBuffRemaining(id){
+  const key=`${id}End`;
+  return Math.max(0,Math.ceil(((G.manaBuffs?.[key]||0)-G.tick)/60));
+}
+
+function activateManaAbility(id){
+  const ability=MANA_ABILITIES.find(a=>a.id===id);
+  if(!ability){showSnot('Unknown mana ritual');return;}
+  if((G.resources.mana.amount||0)<ability.cost){showSnot('Not enough mana');return;}
+  if(isManaBuffActive(id)){showSnot(`${ability.name} is already active`);return;}
+  G.resources.mana.amount-=ability.cost;
+  G.manaBuffs[`${id}End`]=G.tick+ability.duration;
+  addLog(`${ability.name} is invoked. ${ability.desc}`,'important');
+  showOverlay(`${ability.name}\n${ability.desc}`,'success','Mana Ritual');
+  renderAll();
+  saveGame();
+}
+
+function heroArmyBonusFor(h){
+  return Math.min(0.18,0.03+(h.level*0.005));
+}
+
+function totalAssignedHeroArmyBonus(){
+  return G.heroes.reduce((sum,h)=>sum+((h.assignment==='army')?heroArmyBonusFor(h):0),0);
+}
+
+function assignHeroToArmy(i){
+  const h=G.heroes[i];
+  if(!h)return;
+  if(h.onQuest){showSnot('Hero must return from quest first');return;}
+  h.assignment='army';
+  h.autoQuest=false;
+  addLog(`${h.name} is assigned to the field army. Army power rises by ${Math.round(heroArmyBonusFor(h)*100)}%.`,'important');
+  renderAll();
+  saveGame();
+}
+
+function releaseHeroFromArmy(i){
+  const h=G.heroes[i];
+  if(!h)return;
+  h.assignment='';
+  addLog(`${h.name} returns from army command and can quest again.`);
+  renderAll();
+  saveGame();
 }
 
 // â”€â”€ TROOP TRAINING â”€â”€
@@ -747,15 +832,19 @@ function checkTraining(){
 
 // â”€â”€ NPC FARM ATTACK â”€â”€
 function calcAttackPower(sent){
-  return Object.entries(sent).reduce((sum,[type,qty])=>{
+  const base=Object.entries(sent).reduce((sum,[type,qty])=>{
     return sum+(TROOP_DEF[type]?.atk||0)*qty;
   },0);
+  const bonus=totalAssignedHeroArmyBonus()+(isManaBuffActive('battle')?0.25:0);
+  return Math.floor(base*(1+bonus));
 }
 
 function calcReadyTroopPower(){
-  return Object.entries(G.troops).reduce((sum,[type,t])=>{
+  const base=Object.entries(G.troops).reduce((sum,[type,t])=>{
     return sum+(TROOP_DEF[type]?.atk||0)*(t.available||0);
   },0);
+  const bonus=totalAssignedHeroArmyBonus()+(isManaBuffActive('battle')?0.25:0);
+  return Math.floor(base*(1+bonus));
 }
 
 function calcLootCapacity(sent){
@@ -1022,7 +1111,7 @@ function resolveRaid(raid){
     });
 
     // NPC — troops injured not killed
-    const injuryRate=Math.max(0,(farm.def/atkPow)*0.3);
+    const injuryRate=Math.max(0,(farm.def/atkPow)*0.3)*(isManaBuffActive('ward')?0.75:1);
     let totalInjured=0;
     Object.entries(raid.sent).forEach(([type,qty])=>{
       const injured=Math.floor(qty*injuryRate);
@@ -1127,6 +1216,9 @@ function renderCombat(){
   tab.querySelectorAll('[id^="train-qty-"]').forEach(input=>{ trainValues[input.id]=input.value; });
   const barracksLvl=blvl('barracks');
   const readyPower=calcReadyTroopPower();
+  const heroArmyBonus=Math.round(totalAssignedHeroArmyBonus()*100);
+  const manaBattle=!!isManaBuffActive('battle');
+  const manaWard=!!isManaBuffActive('ward');
 
   if(barracksLvl===0){
     tab.innerHTML=`<div class="section"><div class="section-title">⚔ Combat</div>
@@ -1179,6 +1271,18 @@ function renderCombat(){
         <div class="raid-progress" style="margin-top:4px"><div class="raid-progress-inner" style="width:${Math.round(((G.tick-(G.hospital.recoverEnd-G.hospital.recovering*10))/(G.hospital.recovering*10))*100)}%;background:var(--forest-light)"></div></div>`
       :`<div style="font-size:11px;color:var(--stone-light);font-style:italic">${hospitalLvl===0?'Build a Hospital to recover injured troops faster.':'No troops recovering.'}</div>`
     }
+  </div>`;
+
+  const armyBonusHtml=`<div class="hospital-card" style="background:rgba(201,168,76,.05);border-color:rgba(201,168,76,.18)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <span style="font-family:'Cinzel',serif;font-size:11px;color:var(--gold)">⚔ Army Command</span>
+      <span style="font-size:10px;color:var(--stone-light)">${G.heroes.filter(h=>h.assignment==='army').length} hero${G.heroes.filter(h=>h.assignment==='army').length!==1?'es':''} assigned</span>
+    </div>
+    <div style="font-size:11px;color:var(--stone-light);line-height:1.5">
+      Hero command bonus: <span style="color:var(--forest-light)">+${heroArmyBonus}% power</span>
+      ${manaBattle?` · <span style="color:var(--gold)">Battle Hymn active (${manaBuffRemaining('battle')}m)</span>`:''}
+      ${manaWard?` · <span style="color:var(--gold)">Ley Ward active (${manaBuffRemaining('ward')}m)</span>`:''}
+    </div>
   </div>`;
 
   const activeRaidsHtml=G.activeRaids.length?`
@@ -1287,6 +1391,7 @@ function renderCombat(){
     <div class="section">
       <div class="section-title">⚔ Army</div>
       ${hospitalHtml}
+      ${armyBonusHtml}
       <div class="troop-grid">${troopsHtml}</div>
     </div>
     ${activeRaidsHtml}
@@ -1592,7 +1697,8 @@ function gameTick(){
   G.tick++;
   const rally=G._rallied&&G.tick<=G._rallyEnd;
   if(G._rallied&&G.tick>G._rallyEnd){G._rallied=false;addLog('The people\'s rally ends. Income returns to normal.');}
-  const boost=earlyBoost()*(rally?2:1);
+  const harvestBoost=isManaBuffActive('harvest')?1.5:1;
+  const boost=earlyBoost()*(rally?2:1)*harvestBoost;
   Object.values(G.resources).forEach(r=>{if(r.rate>0)r.amount=Math.min(r.max,r.amount+(r.rate*boost)/60);});
   if(G.hasAlchemy&&G.tick%60===0&&G.resources.mana.amount>=10){
     G.resources.mana.amount-=10;G.resources.gold.amount=Math.min(G.resources.gold.max,G.resources.gold.amount+50);
@@ -1744,13 +1850,14 @@ function spawnHero(){
   const avail=HERO_NAMES.filter(n=>!used.includes(n));
   if(!avail.length)return;
   const name=avail[0],cls=HERO_CLS[G.heroes.length%HERO_CLS.length];
-  G.heroes.push({name,cls,level:1,xp:0,xpGoal:100,power:5+G.heroes.length*2,hp:100,maxHp:100,onQuest:false,qt:0,qname:'',qDef:null,_ret:false,autoQuest:false});
+  G.heroes.push({name,cls,level:1,xp:0,xpGoal:100,power:5+G.heroes.length*2,hp:100,maxHp:100,onQuest:false,qt:0,qname:'',qDef:null,_ret:false,autoQuest:false,assignment:''});
   addLog(`${name} the ${cls} joins your banner!`,'important');
   showOverlay(`${name} the ${cls} is ready.`,'success','Hero Arrived');
   setBadge('heroes',G.activeTab!=='heroes');
 }
 function sendOnQuest(i){
   const h=G.heroes[i];if(!h||h.onQuest)return;
+  if(h.assignment==='army'){showSnot('Withdraw this hero from the army first');return;}
   const avail=QUESTS.filter(q=>h.power>=q.minP);
   if(!avail.length){showSnot('Hero too weak for available quests');return;}
   const q=avail[Math.floor(Math.random()*avail.length)];
@@ -1761,7 +1868,7 @@ function sendOnQuest(i){
 }
 
 function sendHeroOnBestQuest(h){
-  if(!h||h.onQuest||h.level>=HERO_LEVEL_CAP)return false;
+  if(!h||h.onQuest||h.level>=HERO_LEVEL_CAP||h.assignment==='army')return false;
   const avail=QUESTS.filter(q=>h.power>=q.minP);
   if(!avail.length)return false;
   const q=avail[avail.length-1];
@@ -1774,6 +1881,10 @@ function sendHeroOnBestQuest(h){
 function toggleHeroAutoQuest(i){
   const h=G.heroes[i];
   if(!h)return;
+  if(h.assignment==='army'){
+    showSnot('Withdraw this hero from the army to auto-quest');
+    return;
+  }
   h.autoQuest=!h.autoQuest;
   if(h.autoQuest&&h.level>=HERO_LEVEL_CAP){
     h.autoQuest=false;
@@ -1927,7 +2038,8 @@ function attachResourceCardClicks(){
 function effectiveResourceRate(key){
   const r=G.resources[key];if(!r)return 0;
   const rally=G._rallied&&G.tick<=G._rallyEnd;
-  let gain=(r.rate||0)*earlyBoost()*(rally?2:1);
+  const harvestBoost=isManaBuffActive('harvest')?1.5:1;
+  let gain=(r.rate||0)*earlyBoost()*(rally?2:1)*harvestBoost;
   if(key==='iron')gain+=blvl('mine')*0.2;
   gain+=totalVillageTributePerMinute()[key]||0;
   return gain;
@@ -2209,8 +2321,11 @@ function renderHeroes(){
     const xpP=Math.round((h.xp/h.xpGoal)*100);
     const avail=QUESTS.filter(q=>h.power>=q.minP);
     const bestQuest=avail[avail.length-1];
+    const inArmy=h.assignment==='army';
+    const armyBonus=Math.round(heroArmyBonusFor(h)*100);
     let status='Resting in the keep',sc='';
     if(h.onQuest){const m=Math.ceil(h.qt/60);status=`On quest: ${h.qname} (~${m}m)`;sc='onq';}
+    else if(inArmy){status=`Assigned to the field army (+${armyBonus}% army power)`;sc='ret';}
     else if(h.level>=HERO_LEVEL_CAP){status=`At level cap (${HERO_LEVEL_CAP})`;sc='ret';}
     return`<div class="hcard">
       <div class="hname">⚔ ${h.name}</div>
@@ -2223,13 +2338,18 @@ function renderHeroes(){
       <div style="font-size:10px;color:var(--stone-light);margin-bottom:3px">XP ${h.xp}/${h.xpGoal}</div>
       <div class="hxp"><div class="hxp-i" style="width:${xpP}%"></div></div>
       <div class="hstatus ${sc}">${status}</div>
-      ${bestQuest&&!h.onQuest?`<div style="font-size:10px;color:var(--stone-light);font-style:italic;margin-bottom:5px">Possible reward: ${questRewardText(bestQuest)}</div>`:''}
+      ${bestQuest&&!h.onQuest&&!inArmy?`<div style="font-size:10px;color:var(--stone-light);font-style:italic;margin-bottom:5px">Possible reward: ${questRewardText(bestQuest)}</div>`:''}
       <div class="hero-actions">
-        <button class="qbtn ${h.onQuest?'ret':''}" onclick="${h.onQuest?'':(`sendOnQuest(${i})`)}" ${h.onQuest||!avail.length||h.level>=HERO_LEVEL_CAP?'disabled':''} style="flex:1">
-          ${h.onQuest?'⏳ On Quest':(avail.length?`⚔ Quest (${avail.length})`:'⚠ Too Weak')}
+        <button class="qbtn ${h.onQuest?'ret':''}" onclick="${h.onQuest?'':(`sendOnQuest(${i})`)}" ${h.onQuest||inArmy||!avail.length||h.level>=HERO_LEVEL_CAP?'disabled':''} style="flex:1">
+          ${h.onQuest?'⏳ On Quest':(inArmy?'⚔ In Army':(avail.length?`⚔ Quest (${avail.length})`:'⚠ Too Weak'))}
         </button>
-        <button class="qbtn hero-auto-btn ${h.autoQuest?'ret':''}" onclick="toggleHeroAutoQuest(${i})" ${h.level>=HERO_LEVEL_CAP?'disabled':''}>
+        <button class="qbtn hero-auto-btn ${h.autoQuest?'ret':''}" onclick="toggleHeroAutoQuest(${i})" ${h.level>=HERO_LEVEL_CAP||inArmy?'disabled':''}>
           ${h.autoQuest?'↻ Auto On':'Auto'}
+        </button>
+      </div>
+      <div class="hero-actions" style="margin-top:6px">
+        <button class="qbtn ${inArmy?'ret':''}" onclick="${inArmy?`releaseHeroFromArmy(${i})`:`assignHeroToArmy(${i})`}" ${h.onQuest?'disabled':''} style="flex:1">
+          ${inArmy?'↩ Withdraw from Army':`🛡 Assign to Army (+${armyBonus}%)`}
         </button>
       </div>
     </div>`;
@@ -2243,6 +2363,8 @@ function renderFaction(){
   const weeksLeft=SEASON_WEEKS-G.seasonWeek;
   const tribute=totalVillageTributePerMinute();
   const governed=G.npcFarms.filter(f=>getVillageState(f.id).governed);
+  const assignedArmyHeroes=G.heroes.filter(h=>h.assignment==='army');
+  const activeManaBuffs=MANA_ABILITIES.filter(a=>isManaBuffActive(a.id));
   const villageCards=governed.length?governed.map(farm=>{
     const state=getVillageState(farm.id);
     const options=villageFocusOptions(farm);
@@ -2340,6 +2462,34 @@ function renderFaction(){
           </button>
         </div>`;
       }).join('')}
+    </div>
+
+    <div class="section">
+      <div class="section-title">✨ Mana Rituals</div>
+      <div style="font-size:12px;color:var(--stone-light);font-style:italic;margin-bottom:10px">Stored mana can be spent on short kingdom and army rituals instead of sitting capped.</div>
+      ${MANA_ABILITIES.map(a=>{
+        const active=isManaBuffActive(a.id);
+        const rem=manaBuffRemaining(a.id);
+        const canUse=!active&&(G.resources.mana.amount>=a.cost);
+        return `<div style="background:rgba(201,168,76,.04);border:1px solid rgba(201,168,76,.12);border-radius:4px;padding:10px;margin-bottom:7px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+            <span style="font-family:'Cinzel',serif;font-size:12px;color:var(--parchment)">${a.icon} ${a.name}</span>
+            <span style="font-family:'Cinzel',serif;font-size:10px;color:var(--gold);background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);border-radius:2px;padding:1px 6px">${a.cost} mana</span>
+          </div>
+          <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-bottom:6px">${a.desc}</div>
+          ${active?`<div style="font-size:11px;color:var(--forest-light);margin-bottom:6px">Active · ${rem} min remaining</div>`:''}
+          <button onclick="activateManaAbility('${a.id}')" ${canUse?'':'disabled'}
+            style="width:100%;padding:5px;background:${canUse?'rgba(201,168,76,.1)':'rgba(255,255,255,.03)'};border:1px solid ${canUse?'var(--gold-dark)':'rgba(201,168,76,.15)'};border-radius:3px;color:${canUse?'var(--gold)':'var(--stone-light)'};font-family:'Cinzel',serif;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;cursor:${canUse?'pointer':'not-allowed'}">
+            ${active?'Already Active':`Invoke · ${a.cost} mana`}
+          </button>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="section">
+      <div class="section-title">⚔ Hero Commands</div>
+      <div class="ftrait"><div class="ftrait-name">Field Army</div><div class="ftrait-desc">${assignedArmyHeroes.length?`${assignedArmyHeroes.map(h=>`${h.name} (+${Math.round(heroArmyBonusFor(h)*100)}%)`).join(' · ')}. Total army bonus: +${Math.round(totalAssignedHeroArmyBonus()*100)}%.`:'No heroes are assigned to the field army yet.'}</div></div>
+      <div class="ftrait"><div class="ftrait-name">Command Rule</div><div class="ftrait-desc">Heroes assigned to the army boost raid power and pause their questing until withdrawn.</div></div>
     </div>
 
     <div class="section">
