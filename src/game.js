@@ -27,6 +27,7 @@ const G={
   mapTiles:[],log:[],logDirty:true,
   activeResearchTab:'economy',activeTab:'kingdom',
   showLockedBuildings:false,
+  showMaxedBuildings:false,
   revealedBuildings:['farm','lumber','mine','market'],
   revealedResearch:['trade_routes','crop_rotation','swordsmanship','fortification'],
   unlockedResearchTabs:['economy','military'],
@@ -58,7 +59,7 @@ const G={
   activeResearch2:null,
   researchProgress2:0,
   // â”€â”€ STORAGE â”€â”€
-  storageLevels:{granary:0,vault:0,timberyard:0,armoury:0},
+  storageLevels:{granary:0,vault:0,timberyard:0,armoury:0,manawell:0},
   // â”€â”€ UI FLAGS â”€â”€
   cityDirty:true,
   logDirty:true,
@@ -101,8 +102,8 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '0.9.6';
-const CACHE_VERSION = 'hc-v36';
+const APP_VERSION = '0.9.7';
+const CACHE_VERSION = 'hc-v37';
 const RELIC_STACK_CAP = 5;
 
 const VILLAGE_FOCUS={
@@ -620,6 +621,7 @@ function buildSavePayload(){
     tick:G.tick,
     revealedBuildings:G.revealedBuildings,revealedResearch:G.revealedResearch,
     showLockedBuildings:G.showLockedBuildings,
+    showMaxedBuildings:G.showMaxedBuildings,
     unlockedResearchTabs:G.unlockedResearchTabs,
     flags:{costReduction:G.costReduction,wardProtect:G.wardProtect,hasAlchemy:G.hasAlchemy,
            hasFarsight:G.hasFarsight,hasSiege:G.hasSiege,questTimeMulti:G.questTimeMulti,fortBonus:G.fortBonus},
@@ -657,6 +659,7 @@ function applyLoadedState(s){
   if(s.revealedBuildings)G.revealedBuildings=s.revealedBuildings;
   if(s.revealedResearch)G.revealedResearch=s.revealedResearch;
   G.showLockedBuildings=!!s.showLockedBuildings;
+  G.showMaxedBuildings=!!s.showMaxedBuildings;
   if(s.unlockedResearchTabs)G.unlockedResearchTabs=s.unlockedResearchTabs;
   if(s.flags){const f=s.flags;G.costReduction=f.costReduction;G.wardProtect=f.wardProtect;G.hasAlchemy=f.hasAlchemy;G.hasFarsight=f.hasFarsight;G.hasSiege=f.hasSiege;G.questTimeMulti=f.questTimeMulti;G.fortBonus=f.fortBonus;}
   if(s.troops)Object.assign(G.troops,s.troops);
@@ -693,6 +696,7 @@ function initCombat(){
 function trainTroops(type,qty){
   const def=TROOP_DEF[type];
   if(!def)return;
+  if(qty<1){showSnot('Enter a troop amount');return;}
   const barracksLvl=blvl('barracks');
   if(barracksLvl<def.reqBarracks){showSnot(`Requires Barracks level ${def.reqBarracks}`);return;}
   const t=G.troops[type];
@@ -705,6 +709,13 @@ function trainTroops(type,qty){
   t.trainEnd=G.tick+(def.trainTime*qty);
   addLog(`Training ${qty} ${def.name}. Ready in ${Math.round(def.trainTime*qty/60)} min.`);
   renderCombat();
+}
+
+function maxTrainQty(type){
+  const def=TROOP_DEF[type];
+  if(!def)return 0;
+  const limits=Object.entries(def.cost).map(([r,v])=>Math.floor((G.resources[r]?.amount||0)/v));
+  return Math.max(0,Math.min(...limits));
 }
 
 function checkTraining(){
@@ -806,8 +817,14 @@ function villageTributePerMinute(farm){
   return tribute;
 }
 
-function villageTributeString(farm){
-  return Object.entries(villageTributePerMinute(farm)).map(([key,val])=>`${G.resources[key]?.icon||key}${val.toFixed(1)}/m`).join(' ');
+function tributeRateString(tribute, perHour=false){
+  const mult=perHour?60:1;
+  const suffix=perHour?'/h':'/m';
+  return Object.entries(tribute).map(([key,val])=>`${G.resources[key]?.icon||key}${(val*mult).toFixed(1)}${suffix}`).join(' ');
+}
+
+function villageTributeString(farm, perHour=false){
+  return tributeRateString(villageTributePerMinute(farm), perHour);
 }
 
 function addVillageControl(farmId, amount){
@@ -1123,9 +1140,10 @@ function renderCombat(){
       </div>
       ${t.training>0?`<div style="font-size:10px;color:var(--gold);font-style:italic;margin-bottom:4px">Training ${t.training}… ${minsLeft}m left</div>
         <div class="raid-progress"><div class="raid-progress-inner" style="width:${trainPct}%"></div></div>`:''}
-      <div style="display:flex;gap:4px;margin-top:6px">
+      <div class="train-entry">
         <input type="number" inputmode="numeric" pattern="[0-9]*" autocomplete="off" id="train-qty-${type}" min="1" max="999" value="10"
           style="width:50px;padding:4px;background:rgba(255,255,255,.04);border:1px solid rgba(201,168,76,.2);border-radius:3px;color:var(--parchment);font-size:11px;text-align:center;">
+        <button class="train-btn train-max-btn" onclick="setTrainMax('${type}')" ${t.training>0?'disabled':''}>Max</button>
         <button class="train-btn" onclick="trainFromInput('${type}')" ${t.training>0?'disabled':''} style="flex:1">
           ${t.training>0?'Training…':'Train'}
         </button>
@@ -1179,40 +1197,12 @@ function renderCombat(){
     const controlNeed=farm.controlNeed||100;
     const controlPct=Math.min(100,Math.round(((state.control||0)/controlNeed)*100));
     const canGovern=canGovernVillage(farm);
-    return`<div class="npc-card ${farm.available?'':''}">
-      <div class="npc-header">
-        <span class="npc-name">${farm.icon} ${farm.name}</span>
-        <span class="npc-level">Lv ${farm.level}</span>
-      </div>
-      <div class="npc-loot">Loot: ${lootStr}</div>
-      <div style="font-size:10px;color:${state.governed?'var(--forest-light)':'var(--stone-light)'};margin-bottom:6px">
-        ${state.governed?`Governed · ${villageFocusLabel(state.focus||'balanced')} focus · Tribute ${villageTributeString(farm)}`:`Control ${Math.floor(state.control||0)}/${controlNeed} · ${state.victories||0} victories`}
-      </div>
-      <div class="raid-progress" style="margin-bottom:6px"><div class="raid-progress-inner" style="width:${controlPct}%;background:${state.governed?'linear-gradient(90deg,var(--forest-light),var(--gold))':'linear-gradient(90deg,var(--blood-light),var(--gold))'}"></div></div>
-      <div class="npc-power-row">
-        <span>Required: ${farm.def}</span>
-        <span class="${canBeat?'ok':'low'}">Available power: ${readyPower}</span>
-      </div>
-      ${state.governed?
-        `<div style="font-size:11px;color:var(--forest-light);font-style:italic">Tributary secured. No further raids needed.</div>`:
-        !farm.available?
-        `<div style="font-size:11px;color:var(--stone-light);font-style:italic">Respawns in ${minsToRespawn}m</div>`
-        :`<div style="font-size:10px;color:var(--gold-dark);margin-bottom:6px;font-family:'Cinzel',serif">Send troops:</div>
-        <div class="troop-send">
-          ${Object.entries(TROOP_DEF).filter(([type])=>blvl('barracks')>=TROOP_DEF[type].reqBarracks&&type!=='siege').map(([type,def])=>`
-            <div>
-              <div class="send-label">${def.icon} ${def.name} (${G.troops[type].available})</div>
-              <input type="number" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="send-input" id="send-${farm.id}-${type}" min="0" max="${G.troops[type].available}" value="0" placeholder="0">
-            </div>`).join('')}
-        </div>
-        <button class="attack-btn" onclick="launchAttack('${farm.id}')">⚔ Attack</button>
-        ${hasRaidHistory?`
-        <div class="autofarm-row">
+    const autoControls=`<div class="autofarm-row">
           <div class="toggle-wrap">
             <div class="toggle ${af.enabled?'on':''}" onclick="toggleAutoFarm('${farm.id}')"></div>
             <span class="toggle-label">Auto-farm ${af.enabled?'ON ⚡':'OFF'}</span>
           </div>
-          <button class="train-btn" onclick="disableAutoFarm('${farm.id}')" ${af.enabled?'':'disabled'} style="width:auto;padding-inline:10px">Stop Auto</button>
+          <button class="train-btn" onclick="disableAutoFarm('${farm.id}')" style="width:auto;padding-inline:10px">Stop Auto</button>
         </div>
         <div class="threshold-row">
           <span>Min troops:</span>
@@ -1222,7 +1212,37 @@ function renderCombat(){
           <span>${af.floor||20}%</span>
         </div>
         ${af.enabled&&activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Auto-farm will stop after the current raid returns.</div>`:''}
-        ${af.enabled&&!farm.available&&!activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Auto-farm is armed and waiting for this target to reopen.</div>`:''}`:''}
+        ${af.enabled&&!farm.available&&!activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Auto-farm is armed and waiting for this target to reopen.</div>`:''}
+        ${!hasRaidHistory&&!af.enabled&&!activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Win one raid here to unlock auto-farm.</div>`:''}`;
+    return`<div class="npc-card ${farm.available?'':''}">
+      <div class="npc-header">
+        <span class="npc-name">${farm.icon} ${farm.name}</span>
+        <span class="npc-level">Lv ${farm.level}</span>
+      </div>
+      <div class="npc-loot">Loot: ${lootStr}</div>
+      <div style="font-size:10px;color:${state.governed?'var(--forest-light)':'var(--stone-light)'};margin-bottom:6px">
+        ${state.governed?`Governed · ${villageFocusLabel(state.focus||'balanced')} focus · Tribute ${villageTributeString(farm,true)}`:`Control ${Math.floor(state.control||0)}/${controlNeed} · ${state.victories||0} victories`}
+      </div>
+      <div class="raid-progress" style="margin-bottom:6px"><div class="raid-progress-inner" style="width:${controlPct}%;background:${state.governed?'linear-gradient(90deg,var(--forest-light),var(--gold))':'linear-gradient(90deg,var(--blood-light),var(--gold))'}"></div></div>
+      <div class="npc-power-row">
+        <span>Required: ${farm.def}</span>
+        <span class="${canBeat?'ok':'low'}">Available power: ${readyPower}</span>
+      </div>
+      ${state.governed?
+        `<div style="font-size:11px;color:var(--forest-light);font-style:italic">Tributary secured. No further raids needed.</div>`:
+        !farm.available?
+        `<div style="font-size:11px;color:var(--stone-light);font-style:italic">Respawns in ${minsToRespawn}m</div>
+        ${autoControls}`
+        :`<div style="font-size:10px;color:var(--gold-dark);margin-bottom:6px;font-family:'Cinzel',serif">Send troops:</div>
+        <div class="troop-send">
+          ${Object.entries(TROOP_DEF).filter(([type])=>blvl('barracks')>=TROOP_DEF[type].reqBarracks&&type!=='siege').map(([type,def])=>`
+            <div>
+              <div class="send-label">${def.icon} ${def.name} (${G.troops[type].available})</div>
+              <input type="number" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="send-input" id="send-${farm.id}-${type}" min="0" max="${G.troops[type].available}" value="0" placeholder="0">
+            </div>`).join('')}
+        </div>
+        <button class="attack-btn" onclick="launchAttack('${farm.id}')">⚔ Attack</button>
+        ${autoControls}
         ${canGovern?`<button class="attack-btn" style="margin-top:8px;background:rgba(74,122,50,.14);border-color:rgba(74,122,50,.35);color:var(--forest-light)" onclick="governVillage('${farm.id}')">Crown as Tributary</button>`:
           ((state.control||0)>=controlNeed&&governedVillageCount()>=currentAdminCap())?`<div style="font-size:10px;color:var(--blood-light);margin-top:8px;font-style:italic">Administration full (${governedVillageCount()}/${currentAdminCap()}). Raise Citadel or advance a dynasty.</div>`:''}
         `}
@@ -1276,8 +1296,14 @@ function renderCombat(){
 
 function trainFromInput(type){
   const el=document.getElementById('train-qty-'+type);
-  const qty=parseInt(el?.value)||1;
-  trainTroops(type,Math.max(1,qty));
+  const qty=parseInt(el?.value,10);
+  trainTroops(type,Number.isFinite(qty)?qty:1);
+}
+
+function setTrainMax(type){
+  const el=document.getElementById('train-qty-'+type);
+  if(!el)return;
+  el.value=Math.min(999,maxTrainQty(type));
 }
 
 function setAutoFarmFloor(farmId,val){
@@ -1390,9 +1416,12 @@ function toggleAutoFarm(farmId){
 }
 
 function disableAutoFarm(farmId){
-  if(!G.autoFarm[farmId])return;
+  if(!G.autoFarm[farmId]){
+    G.autoFarm[farmId]={enabled:false,floor:20};
+  }
+  const wasEnabled=!!G.autoFarm[farmId].enabled;
   G.autoFarm[farmId].enabled=false;
-  addLog(`Auto-farm stopped for ${G.npcFarms.find(f=>f.id===farmId)?.name}.`);
+  if(wasEnabled)addLog(`Auto-farm stopped for ${G.npcFarms.find(f=>f.id===farmId)?.name}.`);
   renderCombat();
 }
 
@@ -1939,15 +1968,29 @@ function buildingRequirementText(bDef){
   }).join(', ');
 }
 
+function hasBuiltParentForBuilding(id){
+  return BD.some(b=>b.unlocks?.includes(id)&&blvl(b.id)>=1);
+}
+
+function isBuildingVisible(bDef){
+  return bviz(bDef.id)||blvl(bDef.id)>0||chkReq(bDef)||hasBuiltParentForBuilding(bDef.id);
+}
+
 function renderBuildings(){
   const el=document.getElementById('building-list');if(!el)return;
-  let html=`<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+  let html=`<div class="build-toolbar">
     <button class="bbtn" onclick="toggleLockedBuildings()" style="width:auto;padding-inline:10px">
       ${G.showLockedBuildings?'Hide Locked Buildings':'Show Locked Buildings'}
     </button>
+    <button class="bbtn" onclick="toggleMaxedBuildings()" style="width:auto;padding-inline:10px">
+      ${G.showMaxedBuildings?'Hide Maxed':'Show Maxed'}
+    </button>
   </div>`;
   BD.forEach(bDef=>{
-    const vis=bviz(bDef.id);
+    const vis=isBuildingVisible(bDef);
+    const lvl=blvl(bDef.id);
+    const maxed=lvl>=bDef.max;
+    if(maxed&&!G.showMaxedBuildings)return;
     if(!vis){
       if(G.showLockedBuildings){
         html+=`<div class="bcard" style="opacity:.6">
@@ -1958,7 +2001,7 @@ function renderBuildings(){
         return;
       }
       // show mystery if parent built
-      const parentBuilt=BD.some(b=>b.unlocks?.includes(bDef.id)&&blvl(b.id)>=1);
+      const parentBuilt=hasBuiltParentForBuilding(bDef.id);
       if(!parentBuilt)return;
       html+=`<div class="mystery"><div class="mystery-icon">🔒</div>
         <div><div class="mystery-title">??? Unknown Structure</div>
@@ -1966,7 +2009,7 @@ function renderBuildings(){
       return;
     }
     const bState=G.buildings.find(b=>b.id===bDef.id);
-    const lvl=bState?.level||0,nl=lvl+1,maxed=lvl>=bDef.max,req=chkReq(bDef);
+    const nl=(bState?.level||0)+1,req=chkReq(bDef);
     let costs=bDef.cost(nl);
     if(G.costReduction&&!maxed)costs=Object.fromEntries(Object.entries(costs).map(([k,v])=>[k,Math.floor(v*G.costReduction)]));
     const aff=!maxed&&canAfford(costs)&&req;
@@ -1990,6 +2033,12 @@ function toggleLockedBuildings(){
   saveGame();
 }
 
+function toggleMaxedBuildings(){
+  G.showMaxedBuildings=!G.showMaxedBuildings;
+  renderBuildings();
+  saveGame();
+}
+
 // â”€â”€ ISOMETRIC CITY VIEW â”€â”€
 let _popupBuildingId=null;
 
@@ -2000,7 +2049,7 @@ function renderMap(){
   const zones=CITY_ZONES.map(z=>{
     const lvl=blvl(z.id);
     const bDef=BD.find(x=>x.id===z.id);if(!bDef)return'';
-    const revealed=G.revealedBuildings.includes(z.id)||lvl>0;
+    const revealed=isBuildingVisible(bDef);
     const reqMet=!bDef.req||Object.entries(bDef.req).every(([id,l])=>blvl(id)>=l);
 
     return`<div class="city-zone" style="left:${z.x}%;top:${z.y}%;width:${z.w}%;height:${z.h}%;"
@@ -2161,12 +2210,12 @@ function renderHeroes(){
       <div class="hxp"><div class="hxp-i" style="width:${xpP}%"></div></div>
       <div class="hstatus ${sc}">${status}</div>
       ${bestQuest&&!h.onQuest?`<div style="font-size:10px;color:var(--stone-light);font-style:italic;margin-bottom:5px">Possible reward: ${questRewardText(bestQuest)}</div>`:''}
-      <div style="display:flex;gap:6px;margin-top:6px">
+      <div class="hero-actions">
         <button class="qbtn ${h.onQuest?'ret':''}" onclick="${h.onQuest?'':(`sendOnQuest(${i})`)}" ${h.onQuest||!avail.length||h.level>=HERO_LEVEL_CAP?'disabled':''} style="flex:1">
-          ${h.onQuest?'⏳ On Quest':(avail.length?`⚔ Send on Quest (${avail.length} available)`:'⚠ Too Weak')}
+          ${h.onQuest?'⏳ On Quest':(avail.length?`⚔ Quest (${avail.length})`:'⚠ Too Weak')}
         </button>
-        <button class="qbtn ${h.autoQuest?'ret':''}" onclick="toggleHeroAutoQuest(${i})" ${h.level>=HERO_LEVEL_CAP?'disabled':''} style="flex:0 0 auto;padding-inline:10px">
-          ${h.autoQuest?'↻ Auto':'Auto'}
+        <button class="qbtn hero-auto-btn ${h.autoQuest?'ret':''}" onclick="toggleHeroAutoQuest(${i})" ${h.level>=HERO_LEVEL_CAP?'disabled':''}>
+          ${h.autoQuest?'↻ Auto On':'Auto'}
         </button>
       </div>
     </div>`;
@@ -2188,7 +2237,7 @@ function renderFaction(){
       <div class="village-card-top">
         <div>
           <div class="village-card-name">${farm.icon} ${farm.name}</div>
-          <div class="village-card-meta">${villageFocusLabel(state.focus||'balanced')} focus · ${governorTraitLabel(trait)} governor · ${villageTributeString(farm)}</div>
+          <div class="village-card-meta">${villageFocusLabel(state.focus||'balanced')} focus · ${governorTraitLabel(trait)} governor · ${villageTributeString(farm,true)}</div>
         </div>
         <div class="village-card-level">Lv ${farm.level}</div>
       </div>
@@ -2214,7 +2263,7 @@ function renderFaction(){
     <div class="section">
       <div class="section-title">👑 Realm Expansion</div>
       <div class="ftrait"><div class="ftrait-name">Administration</div><div class="ftrait-desc">${governedVillageCount()} / ${currentAdminCap()} governed villages. Base capacity ${G.adminCap}, Citadel adds ${Math.floor(blvl('citadel')/2)}.</div></div>
-      <div class="ftrait"><div class="ftrait-name">Tribute Flow</div><div class="ftrait-desc">${Object.keys(tribute).length?Object.entries(tribute).map(([k,v])=>`${G.resources[k]?.icon||k}${v.toFixed(1)}/m`).join(' · '):'No villages are paying tribute yet.'}</div></div>
+      <div class="ftrait"><div class="ftrait-name">Tribute Flow</div><div class="ftrait-desc">${Object.keys(tribute).length?tributeRateString(tribute,true).replace(/ /g,' · '):'No villages are paying tribute yet.'}</div></div>
       <div class="ftrait"><div class="ftrait-name">Governed Villages</div><div class="ftrait-desc">${governed.length?governed.map(f=>`${f.icon} ${f.name}`).join(' · '):'None yet. Win repeated raids to fill control, then crown the village from Combat.'}</div></div>
       <div class="ftrait"><div class="ftrait-name">Governor Corps</div><div class="ftrait-desc">${governed.length?`Stewards boost tribute, Wardens add ${totalWardenWallBonus()} wall defence, and Quartermasters add ${Math.round(totalQuartermasterBonus()*100)}% raid carry capacity.`:'No governors assigned yet.'}</div></div>
       ${governed.length?`<div class="village-card-list">${villageCards}</div>`:''}
