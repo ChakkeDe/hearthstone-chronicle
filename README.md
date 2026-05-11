@@ -101,6 +101,7 @@ hearthstone-chronicle/
   docs/
     GDD.md
     QA.md
+    RELEASE.md
   assets/
   styles/
     main.css
