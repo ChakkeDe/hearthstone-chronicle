@@ -209,12 +209,15 @@ body::before{content:'';position:fixed;inset:0;
 .qbtn.ret{background:rgba(74,122,50,.12);border-color:rgba(74,122,50,.35);color:var(--forest-light);}
 .hero-actions{display:flex;gap:6px;margin-top:6px;align-items:stretch;}
 .hero-auto-btn{flex:0 0 auto;min-width:88px;padding-inline:10px;}
-.train-entry{display:flex;gap:4px;margin-top:6px;align-items:center;}
-.train-max-btn{width:auto;flex:0 0 auto;padding-inline:10px;}
+.train-entry{display:flex;gap:4px;margin-top:6px;align-items:center;flex-wrap:nowrap;}
+.train-entry input{min-width:0;width:46px !important;}
+.train-max-btn{width:auto;flex:0 0 auto;padding-inline:8px;min-width:52px;}
 
 @media(max-width:480px){
   .hero-actions{flex-direction:column;}
   .hero-auto-btn{width:100%;min-width:0;}
+  .train-entry{gap:3px;}
+  .train-max-btn{min-width:46px;padding-inline:6px;font-size:8px;letter-spacing:1px;}
 }
 
 /* FACTION */

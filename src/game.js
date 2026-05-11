@@ -102,8 +102,8 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '0.9.7';
-const CACHE_VERSION = 'hc-v37';
+const APP_VERSION = '0.9.8';
+const CACHE_VERSION = 'hc-v38';
 const RELIC_STACK_CAP = 5;
 
 const VILLAGE_FOCUS={
@@ -664,7 +664,7 @@ function applyLoadedState(s){
   if(s.flags){const f=s.flags;G.costReduction=f.costReduction;G.wardProtect=f.wardProtect;G.hasAlchemy=f.hasAlchemy;G.hasFarsight=f.hasFarsight;G.hasSiege=f.hasSiege;G.questTimeMulti=f.questTimeMulti;G.fortBonus=f.fortBonus;}
   if(s.troops)Object.assign(G.troops,s.troops);
   if(s.hospital)Object.assign(G.hospital,s.hospital);
-  if(s.npcFarms)G.npcFarms=s.npcFarms;
+  mergeSavedNpcFarms(s.npcFarms);
   if(s.activeRaids)G.activeRaids=s.activeRaids;
   if(s.combatLog)G.combatLog=s.combatLog;
   if(s.raidReports)G.raidReports=s.raidReports;
@@ -686,6 +686,20 @@ function applyLoadedState(s){
 // Cost helper — cheap early levels, steeper later. Base * 1.65^(level-1)
 function bCost(base, l){
   return Math.round(base * Math.pow(1.65, l-1));
+}
+
+function mergeSavedNpcFarms(savedFarms){
+  if(!Array.isArray(savedFarms)||!savedFarms.length){
+    G.npcFarms=NPC_FARMS.map(f=>({...f}));
+    return;
+  }
+  const savedById=Object.fromEntries(savedFarms.map(f=>[f.id,f]));
+  G.npcFarms=NPC_FARMS.map(base=>({
+    ...base,
+    ...(savedById[base.id]||{}),
+    loot:{...(base.loot||{}),...((savedById[base.id]||{}).loot||{})},
+    tribute:{...(base.tribute||{}),...((savedById[base.id]||{}).tribute||{})},
+  }));
 }
 
 function initCombat(){
@@ -1221,7 +1235,7 @@ function renderCombat(){
       </div>
       <div class="npc-loot">Loot: ${lootStr}</div>
       <div style="font-size:10px;color:${state.governed?'var(--forest-light)':'var(--stone-light)'};margin-bottom:6px">
-        ${state.governed?`Governed · ${villageFocusLabel(state.focus||'balanced')} focus · Tribute ${villageTributeString(farm,true)}`:`Control ${Math.floor(state.control||0)}/${controlNeed} · ${state.victories||0} victories`}
+        ${state.governed?`Governed · ${villageFocusLabel(state.focus||'balanced')} focus · Passive tribute ${villageTributeString(farm,true)}`:`Control ${Math.floor(state.control||0)}/${controlNeed} · ${state.victories||0} victories`}
       </div>
       <div class="raid-progress" style="margin-bottom:6px"><div class="raid-progress-inner" style="width:${controlPct}%;background:${state.governed?'linear-gradient(90deg,var(--forest-light),var(--gold))':'linear-gradient(90deg,var(--blood-light),var(--gold))'}"></div></div>
       <div class="npc-power-row">
@@ -2237,7 +2251,7 @@ function renderFaction(){
       <div class="village-card-top">
         <div>
           <div class="village-card-name">${farm.icon} ${farm.name}</div>
-          <div class="village-card-meta">${villageFocusLabel(state.focus||'balanced')} focus · ${governorTraitLabel(trait)} governor · ${villageTributeString(farm,true)}</div>
+          <div class="village-card-meta">${villageFocusLabel(state.focus||'balanced')} focus · ${governorTraitLabel(trait)} governor · Passive tribute ${villageTributeString(farm,true)}</div>
         </div>
         <div class="village-card-level">Lv ${farm.level}</div>
       </div>
@@ -2263,7 +2277,7 @@ function renderFaction(){
     <div class="section">
       <div class="section-title">👑 Realm Expansion</div>
       <div class="ftrait"><div class="ftrait-name">Administration</div><div class="ftrait-desc">${governedVillageCount()} / ${currentAdminCap()} governed villages. Base capacity ${G.adminCap}, Citadel adds ${Math.floor(blvl('citadel')/2)}.</div></div>
-      <div class="ftrait"><div class="ftrait-name">Tribute Flow</div><div class="ftrait-desc">${Object.keys(tribute).length?tributeRateString(tribute,true).replace(/ /g,' · '):'No villages are paying tribute yet.'}</div></div>
+      <div class="ftrait"><div class="ftrait-name">Passive Tribute per Hour</div><div class="ftrait-desc">${Object.keys(tribute).length?tributeRateString(tribute,true).replace(/ /g,' · '):'No villages are paying tribute yet.'}</div></div>
       <div class="ftrait"><div class="ftrait-name">Governed Villages</div><div class="ftrait-desc">${governed.length?governed.map(f=>`${f.icon} ${f.name}`).join(' · '):'None yet. Win repeated raids to fill control, then crown the village from Combat.'}</div></div>
       <div class="ftrait"><div class="ftrait-name">Governor Corps</div><div class="ftrait-desc">${governed.length?`Stewards boost tribute, Wardens add ${totalWardenWallBonus()} wall defence, and Quartermasters add ${Math.round(totalQuartermasterBonus()*100)}% raid carry capacity.`:'No governors assigned yet.'}</div></div>
       ${governed.length?`<div class="village-card-list">${villageCards}</div>`:''}
