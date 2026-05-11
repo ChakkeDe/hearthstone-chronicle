@@ -34,6 +34,7 @@ The design goal is a strategic idle game that feels readable on mobile, rewards 
 - [Development Rules](AGENTS.md)
 - [Game Design Document](docs/GDD.md)
 - [QA Checklist](docs/QA.md)
+- [Release Process](docs/RELEASE.md)
 
 ## Local Setup
 
@@ -141,32 +142,15 @@ The intended workflow is small, reviewable, low-risk iteration.
 6. Test the app in a browser, especially on mobile-sized layouts
 7. If the update affects caching or deployment behavior, verify the PWA refresh flow
 
-### Release checklist
+### Release workflow
 
-Before merging a release-ready patch:
+Use the dedicated [Release Process](docs/RELEASE.md) document for:
 
-1. Confirm the change respects [AGENTS.md](AGENTS.md)
-2. Re-read relevant sections of [docs/GDD.md](docs/GDD.md)
-3. Verify no dependencies or tooling layers were added unnecessarily
-4. Run syntax checks on changed scripts
-5. Test save/load, offline progress, and mobile readability
-6. If the release changes the app shell or any cached static asset:
-   - update `APP_VERSION` in `src/game.js` when the visible app version should change
-   - update `CACHE_VERSION` in `src/game.js`
-   - update the `app` and `cache` fields in `version.json`
-   - update `CACHE` in `sw.js`
-7. Confirm `CACHE_VERSION` in `src/game.js`, `cache` in `version.json`, and `CACHE` in `sw.js` all match exactly
-8. Confirm `sw.js` includes every required static shell asset, including:
-   - `src/save.js`
-   - manifest and icon files
-   - referenced static art in `assets/`
-9. Deploy to GitHub Pages
-10. Wait for the Pages publish to finish
-11. Open the live app and verify:
-   - the header version label matches the intended release
-   - **Check for Update** reports the latest version or offers the new build
-   - **Reload Latest Version** refreshes a stale client if needed
-12. Re-test the live PWA install on phone if the release changes cached UI or shell files
+- before-release checks
+- version bump steps
+- PWA cache bump steps
+- GitHub Pages deployment steps
+- post-release smoke testing
 
 ## Contributing Notes
 
