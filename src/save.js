@@ -352,3 +352,13 @@ function loadGame(){
     addLog('Chronicle restored. Your dynasty continues...','important');
   }catch(e){}
 }
+
+function clearLocalSave(){
+  const ok = window.confirm('Clear your local save and restart from a fresh kingdom? This cannot be undone.');
+  if(!ok) return;
+  try{
+    localStorage.removeItem('hc4');
+    localStorage.removeItem('hc3');
+  }catch(e){}
+  window.location.reload();
+}
