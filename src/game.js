@@ -26,6 +26,7 @@ const G={
   activeResearch:null,researchProgress:0,
   mapTiles:[],log:[],logDirty:true,
   activeResearchTab:'economy',activeTab:'kingdom',
+  showLockedBuildings:false,
   revealedBuildings:['farm','lumber','mine','market'],
   revealedResearch:['trade_routes','crop_rotation','swordsmanship','fortification'],
   unlockedResearchTabs:['economy','military'],
@@ -100,8 +101,8 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '0.9.5';
-const CACHE_VERSION = 'hc-v35';
+const APP_VERSION = '0.9.6';
+const CACHE_VERSION = 'hc-v36';
 const RELIC_STACK_CAP = 5;
 
 const VILLAGE_FOCUS={
@@ -421,17 +422,20 @@ async function handleAppForeground(){
 
 // â”€â”€ VICTORY PATHS â”€â”€
 function checkVictoryPath(){
-  Object.entries(VICTORY_PATHS).forEach(([key,path])=>{
-    if(path.check()){
-      const bonus=path.bonus;
-      if(G.victoryPath!==key){
-        G.victoryPath=key;
-        G.victoryBonus=bonus;
-        addLog(`${path.icon} ${path.label} path achieved! +${bonus}% prestige bonus active.`,'important');
-        showOverlay(`${path.label}\n+${bonus}% prestige bonus!`,'success','Victory Path Achieved');
-      }
-    }
-  });
+  const completed=Object.entries(VICTORY_PATHS).filter(([,path])=>path.check());
+  if(!completed.length)return;
+  const currentValid=G.victoryPath!=='mixed' && VICTORY_PATHS[G.victoryPath]?.check();
+  if(currentValid){
+    G.victoryBonus=VICTORY_PATHS[G.victoryPath].bonus;
+    return;
+  }
+  const [key,path]=completed[0];
+  if(G.victoryPath!==key){
+    G.victoryPath=key;
+    G.victoryBonus=path.bonus;
+    addLog(`${path.icon} ${path.label} path achieved! +${path.bonus}% renown bonus active.`,'important');
+    showOverlay(`${path.label}\n+${path.bonus}% renown bonus!`,'success','Victory Path Achieved');
+  }
 }
 
 // â”€â”€ PRESTIGE SPENDING â”€â”€
@@ -615,6 +619,7 @@ function buildSavePayload(){
     activeResearch2:G.activeResearch2,researchProgress2:G.researchProgress2,
     tick:G.tick,
     revealedBuildings:G.revealedBuildings,revealedResearch:G.revealedResearch,
+    showLockedBuildings:G.showLockedBuildings,
     unlockedResearchTabs:G.unlockedResearchTabs,
     flags:{costReduction:G.costReduction,wardProtect:G.wardProtect,hasAlchemy:G.hasAlchemy,
            hasFarsight:G.hasFarsight,hasSiege:G.hasSiege,questTimeMulti:G.questTimeMulti,fortBonus:G.fortBonus},
@@ -651,6 +656,7 @@ function applyLoadedState(s){
   G.activeResearch=s.activeResearch||null;G.researchProgress=s.researchProgress||0;G.tick=s.tick||0;
   if(s.revealedBuildings)G.revealedBuildings=s.revealedBuildings;
   if(s.revealedResearch)G.revealedResearch=s.revealedResearch;
+  G.showLockedBuildings=!!s.showLockedBuildings;
   if(s.unlockedResearchTabs)G.unlockedResearchTabs=s.unlockedResearchTabs;
   if(s.flags){const f=s.flags;G.costReduction=f.costReduction;G.wardProtect=f.wardProtect;G.hasAlchemy=f.hasAlchemy;G.hasFarsight=f.hasFarsight;G.hasSiege=f.hasSiege;G.questTimeMulti=f.questTimeMulti;G.fortBonus=f.fortBonus;}
   if(s.troops)Object.assign(G.troops,s.troops);
@@ -1083,6 +1089,11 @@ function checkNPCRespawn(){
 // â”€â”€ RENDER COMBAT â”€â”€
 function renderCombat(){
   const tab=document.getElementById('tab-combat');if(!tab)return;
+  const scrollTop=tab.scrollTop;
+  const sendValues={};
+  tab.querySelectorAll('.send-input').forEach(input=>{ sendValues[input.id]=input.value; });
+  const trainValues={};
+  tab.querySelectorAll('[id^="train-qty-"]').forEach(input=>{ trainValues[input.id]=input.value; });
   const barracksLvl=blvl('barracks');
   const readyPower=calcReadyTroopPower();
 
@@ -1159,6 +1170,9 @@ function renderCombat(){
 
   const npcHtml=G.npcFarms.map(farm=>{
     const state=getVillageState(farm.id);
+    const af=G.autoFarm[farm.id]||{enabled:false,floor:20};
+    const hasRaidHistory=G.combatLog.some(e=>e.msg.includes(farm.name)&&e.type==='victory');
+    const activeRaid=G.activeRaids.find(r=>r.farmId===farm.id);
     const lootStr=Object.entries(farm.loot).map(([r,v])=>`${G.resources[r]?.icon||r}${v}`).join(' ');
     const minsToRespawn=farm.available?0:Math.ceil((farm.respawnAt-G.tick)/60);
     const canBeat=readyPower>=farm.def;
@@ -1192,21 +1206,23 @@ function renderCombat(){
             </div>`).join('')}
         </div>
         <button class="attack-btn" onclick="launchAttack('${farm.id}')">⚔ Attack</button>
-        ${G.combatLog.some(e=>e.msg.includes(farm.name)&&e.type==='victory')?`
+        ${hasRaidHistory?`
         <div class="autofarm-row">
           <div class="toggle-wrap">
-            <div class="toggle ${G.autoFarm[farm.id]?.enabled?'on':''}" onclick="toggleAutoFarm('${farm.id}')"></div>
-            <span class="toggle-label">Auto-farm ${G.autoFarm[farm.id]?.enabled?'ON ⚡':'OFF'}</span>
+            <div class="toggle ${af.enabled?'on':''}" onclick="toggleAutoFarm('${farm.id}')"></div>
+            <span class="toggle-label">Auto-farm ${af.enabled?'ON ⚡':'OFF'}</span>
           </div>
-          <span style="font-size:10px;color:var(--stone-light)">Floor: ${G.autoFarm[farm.id]?.floor||20}%</span>
+          <button class="train-btn" onclick="disableAutoFarm('${farm.id}')" ${af.enabled?'':'disabled'} style="width:auto;padding-inline:10px">Stop Auto</button>
         </div>
         <div class="threshold-row">
           <span>Min troops:</span>
-          <input type="range" min="10" max="50" step="5" value="${G.autoFarm[farm.id]?.floor||20}"
+          <input type="range" min="10" max="50" step="5" value="${af.floor||20}"
             oninput="setAutoFarmFloor('${farm.id}',this.value)"
             style="flex:1;accent-color:var(--gold);">
-          <span>${G.autoFarm[farm.id]?.floor||20}%</span>
-        </div>`:''}
+          <span>${af.floor||20}%</span>
+        </div>
+        ${af.enabled&&activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Auto-farm will stop after the current raid returns.</div>`:''}
+        ${af.enabled&&!farm.available&&!activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Auto-farm is armed and waiting for this target to reopen.</div>`:''}`:''}
         ${canGovern?`<button class="attack-btn" style="margin-top:8px;background:rgba(74,122,50,.14);border-color:rgba(74,122,50,.35);color:var(--forest-light)" onclick="governVillage('${farm.id}')">Crown as Tributary</button>`:
           ((state.control||0)>=controlNeed&&governedVillageCount()>=currentAdminCap())?`<div style="font-size:10px;color:var(--blood-light);margin-top:8px;font-style:italic">Administration full (${governedVillageCount()}/${currentAdminCap()}). Raise Citadel or advance a dynasty.</div>`:''}
         `}
@@ -1247,6 +1263,15 @@ function renderCombat(){
     </div>
     ${raidReportHtml}
     ${combatLogHtml}`;
+  Object.entries(sendValues).forEach(([id,val])=>{
+    const input=document.getElementById(id);
+    if(input&&document.activeElement?.id!==id)input.value=val;
+  });
+  Object.entries(trainValues).forEach(([id,val])=>{
+    const input=document.getElementById(id);
+    if(input&&document.activeElement?.id!==id)input.value=val;
+  });
+  tab.scrollTop=scrollTop;
 }
 
 function trainFromInput(type){
@@ -1360,6 +1385,14 @@ function toggleAutoFarm(farmId){
   if(!G.autoFarm[farmId]) G.autoFarm[farmId]={enabled:false,floor:20};
   G.autoFarm[farmId].enabled=!G.autoFarm[farmId].enabled;
   if(G.autoFarm[farmId].enabled) addLog(`Auto-farm enabled for ${G.npcFarms.find(f=>f.id===farmId)?.name}.`);
+  else addLog(`Auto-farm stopped for ${G.npcFarms.find(f=>f.id===farmId)?.name}.`);
+  renderCombat();
+}
+
+function disableAutoFarm(farmId){
+  if(!G.autoFarm[farmId])return;
+  G.autoFarm[farmId].enabled=false;
+  addLog(`Auto-farm stopped for ${G.npcFarms.find(f=>f.id===farmId)?.name}.`);
   renderCombat();
 }
 
@@ -1735,7 +1768,7 @@ function completeQuest(h){
   h.onQuest=false;h.qt=0;h.qname='';h._ret=true;
   G.prestige+=15;
   addLog(`${h.name} returns from ${q.name}. Rewards: ${rewardText}.`);
-  showOverlay(`${rewardText}\n+15 prestige`,'success','Quest Rewards');
+  showOverlay(`${rewardText}\n+15 renown`,'success','Quest Rewards');
   setBadge('heroes',G.activeTab!=='heroes');
   if(h.level>=HERO_LEVEL_CAP&&h.autoQuest){
     h.autoQuest=false;
@@ -1908,10 +1941,22 @@ function buildingRequirementText(bDef){
 
 function renderBuildings(){
   const el=document.getElementById('building-list');if(!el)return;
-  let html='';
+  let html=`<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+    <button class="bbtn" onclick="toggleLockedBuildings()" style="width:auto;padding-inline:10px">
+      ${G.showLockedBuildings?'Hide Locked Buildings':'Show Locked Buildings'}
+    </button>
+  </div>`;
   BD.forEach(bDef=>{
     const vis=bviz(bDef.id);
     if(!vis){
+      if(G.showLockedBuildings){
+        html+=`<div class="bcard" style="opacity:.6">
+          <div class="bheader"><span class="bname">${bDef.icon} ${bDef.name}</span><span class="blvl">Locked</span></div>
+          <div class="bdesc">${bDef.desc}</div>
+          ${buildingRequirementHtml(bDef)||'<div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-bottom:4px">Progress further to reveal this structure.</div>'}
+        </div>`;
+        return;
+      }
       // show mystery if parent built
       const parentBuilt=BD.some(b=>b.unlocks?.includes(bDef.id)&&blvl(b.id)>=1);
       if(!parentBuilt)return;
@@ -1937,6 +1982,12 @@ function renderBuildings(){
     </div>`;
   });
   el.innerHTML=html;
+}
+
+function toggleLockedBuildings(){
+  G.showLockedBuildings=!G.showLockedBuildings;
+  renderBuildings();
+  saveGame();
 }
 
 // â”€â”€ ISOMETRIC CITY VIEW â”€â”€
