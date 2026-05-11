@@ -104,8 +104,8 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '1.2.6';
-const CACHE_VERSION = 'hc-v48';
+const APP_VERSION = '1.2.7';
+const CACHE_VERSION = 'hc-v49';
 const RELIC_STACK_CAP = 5;
 
 const BASE_RESOURCE_MAX={gold:900,food:900,wood:900,stone:900,iron:600,mana:400};
@@ -1929,35 +1929,100 @@ function spend(costs){Object.entries(costs).forEach(([r,a])=>{G.resources[r].amo
 function blvl(id){return G.buildings.find(b=>b.id===id)?.level||0;}
 function chkReq(bDef){if(!bDef.req)return true;return Object.entries(bDef.req).every(([id,l])=>blvl(id)>=l);}
 
-// Temporary debug helper for investigating Stone Quarry income mismatches.
-function getStoneDebugSnapshot(){
-  const mineLevel=blvl('mine');
-  const mineState=G.buildings.find(b=>b.id==='mine')||null;
-  const quarryDef=BD.find(b=>b.id==='mine')||null;
-  const stonemasonsCompleted=!!G.research?.stonemasons?.completed;
+// Temporary debug helper for diagnosing resource income mismatches on mobile.
+function getResourceDebugSnapshot(){
+  const resourceBuildingMap={
+    gold:['market'],
+    food:['farm'],
+    wood:['lumber'],
+    stone:['mine'],
+    iron:['ironworks','mine'],
+    mana:['tower']
+  };
+  const resourceResearchMap={
+    gold:['trade_routes','banking','guild_ledgers','envoys'],
+    food:['crop_rotation'],
+    wood:[],
+    stone:['stonemasons'],
+    iron:[],
+    mana:['runic_script','mana_reservoirs']
+  };
+  const resourceBuffMap={
+    gold:['earlyBoost',isManaBuffActive('harvest')?'Harvest Blessing':null],
+    food:['earlyBoost',isManaBuffActive('harvest')?'Harvest Blessing':null],
+    wood:['earlyBoost',isManaBuffActive('harvest')?'Harvest Blessing':null],
+    stone:['earlyBoost',isManaBuffActive('harvest')?'Harvest Blessing':null],
+    iron:['earlyBoost',isManaBuffActive('harvest')?'Harvest Blessing':null,'Mine iron trickle'],
+    mana:['earlyBoost',isManaBuffActive('harvest')?'Harvest Blessing':null]
+  };
   const totalBuildingLevels=G.buildings.reduce((sum,b)=>sum+(b.level||0),0);
+  const activeManaBuffs=MANA_ABILITIES.filter(a=>isManaBuffActive(a.id)).map(a=>`${a.name} (${manaBuffRemaining(a.id)}m)`);
+  const tributeSummary=totalVillageTributePerMinute();
+  const relevantResearchCompleted=[...new Set(Object.values(resourceResearchMap).flat())].filter(Boolean).filter(id=>hasResearch(id));
+  const buildingSummaryIds=['farm','lumber','mine','market','ironworks','tower','granary','vault','timberyard','armoury','manawell'];
+  const buildingSummary=buildingSummaryIds.map(id=>{
+    const def=BD.find(b=>b.id===id);
+    return {id,name:def?.name||id,level:blvl(id)};
+  });
+  const resources={};
+  ['gold','food','wood','stone','iron','mana'].forEach(key=>{
+    const buildingIds=resourceBuildingMap[key]||[];
+    const buildingLevels=buildingIds.map(id=>{
+      const def=BD.find(b=>b.id===id);
+      return {
+        id,
+        name:def?.name||id,
+        level:blvl(id),
+        buildingBonus:BUILDING_RATE_BONUS[id]?.[key]||0
+      };
+    });
+    const expectedBuildingContribution=buildingLevels.reduce((sum,entry)=>sum+(entry.level*entry.buildingBonus),0);
+    resources[key]={
+      amount:G.resources?.[key]?.amount ?? null,
+      rate:G.resources?.[key]?.rate ?? null,
+      effectiveRate:effectiveResourceRate(key),
+      max:G.resources?.[key]?.max ?? null,
+      capText:`${Math.floor(G.resources?.[key]?.amount||0)} / ${G.resources?.[key]?.max||0}`,
+      buildingLevels,
+      expectedBuildingContribution,
+      relevantResearch:(resourceResearchMap[key]||[]).map(id=>({id,completed:hasResearch(id)})),
+      activeModifiers:(resourceBuffMap[key]||[]).filter(Boolean),
+      tributePerMinute:tributeSummary[key]||0
+    };
+  });
   return {
     appVersion:APP_VERSION,
     cacheVersion:CACHE_VERSION,
-    stoneAmount:G.resources?.stone?.amount ?? null,
-    stoneRate:G.resources?.stone?.rate ?? null,
-    effectiveStoneRate:effectiveResourceRate('stone'),
     earlyBoost:earlyBoost(),
-    mineLevel,
-    mineBuildingState:mineState,
-    stoneQuarryDefinition:quarryDef,
-    mineRateBonus:BUILDING_RATE_BONUS.mine||null,
-    stonemasonsCompleted,
-    totalBuildingLevels
+    totalBuildingLevels,
+    activeManaBuffs,
+    relevantResearchCompleted,
+    tributeSummary,
+    buildingSummary,
+    resources
   };
 }
 
 function debugStoneIncome(){
-  const snapshot=getStoneDebugSnapshot();
+  const snapshot=getResourceDebugSnapshot();
+  const stoneSnapshot={
+    appVersion:snapshot.appVersion,
+    cacheVersion:snapshot.cacheVersion,
+    stoneAmount:snapshot.resources.stone.amount,
+    stoneRate:snapshot.resources.stone.rate,
+    effectiveStoneRate:snapshot.resources.stone.effectiveRate,
+    earlyBoost:snapshot.earlyBoost,
+    mineLevel:blvl('mine'),
+    mineBuildingState:G.buildings.find(b=>b.id==='mine')||null,
+    stoneQuarryDefinition:BD.find(b=>b.id==='mine')||null,
+    mineRateBonus:BUILDING_RATE_BONUS.mine||null,
+    stonemasonsCompleted:hasResearch('stonemasons'),
+    totalBuildingLevels:snapshot.totalBuildingLevels
+  };
   console.group('debugStoneIncome');
-  console.log('Stone income snapshot',snapshot);
+  console.log('Stone income snapshot',stoneSnapshot);
   console.groupEnd();
-  return snapshot;
+  return stoneSnapshot;
 }
 window.debugStoneIncome=debugStoneIncome;
 
@@ -2044,6 +2109,182 @@ function showStoneDebugPanel(){
 }
 window.showStoneDebugPanel=showStoneDebugPanel;
 window.closeStoneDebugPanel=closeStoneDebugPanel;
+
+function getResourceDebugSnapshot(){
+  const resourceBuildingMap={
+    gold:['market'],
+    food:['farm'],
+    wood:['lumber'],
+    stone:['mine'],
+    iron:['ironworks','mine'],
+    mana:['tower']
+  };
+  const resourceResearchMap={
+    gold:['trade_routes','banking','guild_ledgers','envoys'],
+    food:['crop_rotation'],
+    wood:[],
+    stone:['stonemasons'],
+    iron:[],
+    mana:['runic_script','mana_reservoirs']
+  };
+  const resourceBuffMap={
+    gold:['earlyBoost',isManaBuffActive('harvest')?'Harvest Blessing':null],
+    food:['earlyBoost',isManaBuffActive('harvest')?'Harvest Blessing':null],
+    wood:['earlyBoost',isManaBuffActive('harvest')?'Harvest Blessing':null],
+    stone:['earlyBoost',isManaBuffActive('harvest')?'Harvest Blessing':null],
+    iron:['earlyBoost',isManaBuffActive('harvest')?'Harvest Blessing':null,'Mine iron trickle'],
+    mana:['earlyBoost',isManaBuffActive('harvest')?'Harvest Blessing':null]
+  };
+  const totalBuildingLevels=G.buildings.reduce((sum,b)=>sum+(b.level||0),0);
+  const activeManaBuffs=MANA_ABILITIES.filter(a=>isManaBuffActive(a.id)).map(a=>`${a.name} (${manaBuffRemaining(a.id)}m)`);
+  const tributeSummary=totalVillageTributePerMinute();
+  const relevantResearchCompleted=[...new Set(Object.values(resourceResearchMap).flat())].filter(Boolean).filter(id=>hasResearch(id));
+  const buildingSummaryIds=['farm','lumber','mine','market','ironworks','tower','granary','vault','timberyard','armoury','manawell'];
+  const buildingSummary=buildingSummaryIds.map(id=>{
+    const def=BD.find(b=>b.id===id);
+    return {id,name:def?.name||id,level:blvl(id)};
+  });
+  const resources={};
+  ['gold','food','wood','stone','iron','mana'].forEach(key=>{
+    const buildingIds=resourceBuildingMap[key]||[];
+    const buildingLevels=buildingIds.map(id=>{
+      const def=BD.find(b=>b.id===id);
+      return {id,name:def?.name||id,level:blvl(id),buildingBonus:BUILDING_RATE_BONUS[id]?.[key]||0};
+    });
+    const expectedBuildingContribution=buildingLevels.reduce((sum,entry)=>sum+(entry.level*entry.buildingBonus),0);
+    resources[key]={
+      amount:G.resources?.[key]?.amount ?? null,
+      rate:G.resources?.[key]?.rate ?? null,
+      effectiveRate:effectiveResourceRate(key),
+      max:G.resources?.[key]?.max ?? null,
+      capText:`${Math.floor(G.resources?.[key]?.amount||0)} / ${G.resources?.[key]?.max||0}`,
+      buildingLevels,
+      expectedBuildingContribution,
+      relevantResearch:(resourceResearchMap[key]||[]).map(id=>({id,completed:hasResearch(id)})),
+      activeModifiers:(resourceBuffMap[key]||[]).filter(Boolean),
+      tributePerMinute:tributeSummary[key]||0
+    };
+  });
+  return {
+    appVersion:APP_VERSION,
+    cacheVersion:CACHE_VERSION,
+    earlyBoost:earlyBoost(),
+    totalBuildingLevels,
+    activeManaBuffs,
+    relevantResearchCompleted,
+    tributeSummary,
+    buildingSummary,
+    resources
+  };
+}
+
+function closeResourceDebugPanel(){
+  document.getElementById('resource-debug-panel')?.remove();
+}
+
+function resourceDebugResearchText(entries){
+  const done=entries.filter(r=>r.completed).map(r=>r.id);
+  return done.length?done.join(', '):'none';
+}
+
+function showResourceDebugPanel(){
+  closeResourceDebugPanel();
+  const data=getResourceDebugSnapshot();
+  const resourceRows=['gold','food','wood','stone','iron','mana'].map(key=>{
+    const r=data.resources[key];
+    const buildingText=r.buildingLevels.length
+      ? r.buildingLevels.map(entry=>`${entry.name} Lv${entry.level}`).join(', ')
+      : 'none';
+    const modifierText=[
+      ...r.activeModifiers,
+      r.tributePerMinute>0?`Tribute +${r.tributePerMinute.toFixed(2)}/min`:null
+    ].filter(Boolean).join(', ')||'none';
+    return `
+      <tr>
+        <td style="padding:8px 6px;vertical-align:top;color:var(--gold);font-family:'Cinzel',serif;text-transform:capitalize">${key}</td>
+        <td style="padding:8px 6px;vertical-align:top">${Math.floor(r.amount||0)}</td>
+        <td style="padding:8px 6px;vertical-align:top">${Number(r.rate||0).toFixed(2)}</td>
+        <td style="padding:8px 6px;vertical-align:top">${Number(r.effectiveRate||0).toFixed(2)}</td>
+        <td style="padding:8px 6px;vertical-align:top">${r.capText}</td>
+        <td style="padding:8px 6px;vertical-align:top">${buildingText}</td>
+        <td style="padding:8px 6px;vertical-align:top">+${Number(r.expectedBuildingContribution||0).toFixed(2)}/min</td>
+        <td style="padding:8px 6px;vertical-align:top">research: ${resourceDebugResearchText(r.relevantResearch)}<br>mods: ${modifierText}</td>
+      </tr>`;
+  }).join('');
+  const panel=document.createElement('div');
+  panel.id='resource-debug-panel';
+  panel.style.cssText=`position:fixed;inset:0;background:rgba(5,4,2,.84);z-index:1200;
+    display:flex;align-items:flex-end;justify-content:center;padding:14px 14px calc(env(safe-area-inset-bottom) + 64px);`;
+  panel.innerHTML=`
+    <div style="position:relative;width:min(100%,760px);max-height:min(80vh,760px);overflow-y:auto;overflow-x:hidden;
+      -webkit-overflow-scrolling:touch;background:linear-gradient(180deg,rgba(21,17,10,.985),rgba(12,9,5,.985));
+      border:1px solid rgba(201,168,76,.28);border-radius:10px;box-shadow:0 18px 45px rgba(0,0,0,.55);
+      padding:14px 14px 16px;color:var(--parchment)">
+      <div style="position:sticky;top:0;z-index:1;background:linear-gradient(180deg,rgba(21,17,10,.99),rgba(21,17,10,.92));
+        padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid rgba(201,168,76,.12)">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+          <div>
+            <div style="font-family:'Cinzel',serif;font-size:13px;letter-spacing:1.1px;color:var(--gold)">Temporary Debug UI</div>
+            <div style="font-size:11px;color:var(--stone-light);line-height:1.35">Resource income diagnostic for mobile testing</div>
+          </div>
+          <button onclick="closeResourceDebugPanel()" style="flex:0 0 auto;background:none;border:1px solid rgba(201,168,76,.22);
+            border-radius:4px;color:var(--stone-light);padding:4px 8px;font-size:16px;line-height:1;cursor:pointer">✕</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px">
+        <div style="background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.12);border-radius:6px;padding:8px">
+          <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px">Version</div>
+          <div style="font-size:12px;color:var(--gold);font-family:'Cinzel',serif">v${data.appVersion}</div>
+        </div>
+        <div style="background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.12);border-radius:6px;padding:8px">
+          <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px">Cache</div>
+          <div style="font-size:12px;color:var(--gold);font-family:'Cinzel',serif">${data.cacheVersion}</div>
+        </div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.10);border-radius:6px;padding:8px">
+          <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px">Early Boost</div>
+          <div style="font-size:15px;color:var(--parchment);font-family:'Cinzel',serif">${Number(data.earlyBoost||0).toFixed(2)}x</div>
+        </div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.10);border-radius:6px;padding:8px">
+          <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px">Total Building Levels</div>
+          <div style="font-size:15px;color:var(--parchment);font-family:'Cinzel',serif">${data.totalBuildingLevels}</div>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.10);border-radius:6px;padding:10px;margin-bottom:10px">
+        <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Global Modifiers</div>
+        <div style="font-size:12px;line-height:1.5;color:var(--parchment)">Active mana buffs: ${data.activeManaBuffs.length?data.activeManaBuffs.join(', '):'none'}</div>
+        <div style="font-size:12px;line-height:1.5;color:var(--parchment)">Relevant research complete: ${data.relevantResearchCompleted.length?data.relevantResearchCompleted.join(', '):'none'}</div>
+        <div style="font-size:12px;line-height:1.5;color:var(--parchment)">Village tribute per minute: ${Object.keys(data.tributeSummary).length?tributeRateString(data.tributeSummary):'none'}</div>
+      </div>
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.10);border-radius:6px;padding:10px;margin-bottom:10px">
+        <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Building Summary</div>
+        <pre style="margin:0;white-space:pre-wrap;word-break:break-word;font:11px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--parchment)">${data.buildingSummary.map(entry=>`${entry.name}: Lv${entry.level}`).join('\n')}</pre>
+      </div>
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.10);border-radius:6px;padding:10px">
+        <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Resource Table</div>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+          <table style="width:100%;min-width:760px;border-collapse:collapse;font-size:11px;line-height:1.4">
+            <thead>
+              <tr style="text-align:left;color:var(--stone-light);border-bottom:1px solid rgba(201,168,76,.12)">
+                <th style="padding:6px">Resource</th>
+                <th style="padding:6px">Amount</th>
+                <th style="padding:6px">Base Rate</th>
+                <th style="padding:6px">Effective</th>
+                <th style="padding:6px">Cap</th>
+                <th style="padding:6px">Buildings</th>
+                <th style="padding:6px">Building Bonus</th>
+                <th style="padding:6px">Research / Buffs</th>
+              </tr>
+            </thead>
+            <tbody>${resourceRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  panel.addEventListener('click',e=>{ if(e.target===panel)closeResourceDebugPanel(); });
+  document.body.appendChild(panel);
+}
+window.showResourceDebugPanel=showResourceDebugPanel;
+window.closeResourceDebugPanel=closeResourceDebugPanel;
 
 // ==== INIT ====
 function init(){
@@ -2974,9 +3215,9 @@ function renderFaction(){
         <div class="ftrait-name">Local Chronicle</div>
         <div class="ftrait-desc">Clear the save on this device and restart from a fresh kingdom if you want a clean early-game test.</div>
       </div>
-      <button onclick="showStoneDebugPanel()"
+      <button onclick="showResourceDebugPanel()"
         style="width:100%;padding:8px;background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.22);border-radius:4px;color:var(--gold);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-bottom:8px">
-        Temporary Debug Stone
+        Temporary Debug Resources
       </button>
       <button onclick="clearLocalSave()"
         style="width:100%;padding:8px;background:rgba(138,45,45,.12);border:1px solid rgba(138,45,45,.4);border-radius:4px;color:var(--blood-light);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer">
