@@ -79,7 +79,7 @@ const G={
 function earlyBoost(){
   // Tapers from 5x at 0 buildings to 1x at 25 total levels — much slower fade
   const t=G.buildings.reduce((s,b)=>s+b.level,0);
-  return Math.max(1, 5-(t*0.16));
+  return Math.max(1, 3.2-(t*0.12));
 }
 
 function researchSpeedMultiplier(){
@@ -103,11 +103,22 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '1.1.1';
-const CACHE_VERSION = 'hc-v41';
+const APP_VERSION = '1.2.0';
+const CACHE_VERSION = 'hc-v42';
 const RELIC_STACK_CAP = 5;
 
-const BASE_RESOURCE_MAX={gold:500,food:500,wood:500,stone:500,iron:300,mana:200};
+const BASE_RESOURCE_MAX={gold:900,food:900,wood:900,stone:900,iron:600,mana:400};
+const BASE_RESOURCE_RATE={gold:1,food:1.5,wood:1.5,stone:1,iron:0.35,mana:0};
+const BUILDING_RATE_BONUS={
+  farm:{food:2},
+  lumber:{wood:2},
+  mine:{stone:2},
+  market:{gold:3},
+  ironworks:{iron:2},
+  tower:{mana:2},
+};
+const CITADEL_CAP_PER_LEVEL=700;
+const STORAGE_CAP_PER_LEVEL={granary:700,vault:700,timberyard:700,armoury:650,manawell:650};
 
 const MANA_ABILITIES=[
   {id:'harvest',name:'Harvest Blessing',icon:'✨',cost:110,duration:600,desc:'+50% resource income for 10 minutes.'},
@@ -732,35 +743,99 @@ function mergeSavedNpcFarms(savedFarms){
 function expectedStorageCaps(){
   const citadelLvl=blvl('citadel');
   return {
-    gold:BASE_RESOURCE_MAX.gold+(citadelLvl*450)+(blvl('vault')*300),
-    food:BASE_RESOURCE_MAX.food+(citadelLvl*450)+(blvl('granary')*300),
-    wood:BASE_RESOURCE_MAX.wood+(citadelLvl*450)+(blvl('timberyard')*300),
-    stone:BASE_RESOURCE_MAX.stone+(citadelLvl*450),
-    iron:BASE_RESOURCE_MAX.iron+(citadelLvl*450)+(blvl('armoury')*250),
-    mana:BASE_RESOURCE_MAX.mana+(citadelLvl*450)+(blvl('manawell')*250),
+    gold:BASE_RESOURCE_MAX.gold+(citadelLvl*CITADEL_CAP_PER_LEVEL)+(blvl('vault')*STORAGE_CAP_PER_LEVEL.vault),
+    food:BASE_RESOURCE_MAX.food+(citadelLvl*CITADEL_CAP_PER_LEVEL)+(blvl('granary')*STORAGE_CAP_PER_LEVEL.granary),
+    wood:BASE_RESOURCE_MAX.wood+(citadelLvl*CITADEL_CAP_PER_LEVEL)+(blvl('timberyard')*STORAGE_CAP_PER_LEVEL.timberyard),
+    stone:BASE_RESOURCE_MAX.stone+(citadelLvl*CITADEL_CAP_PER_LEVEL),
+    iron:BASE_RESOURCE_MAX.iron+(citadelLvl*CITADEL_CAP_PER_LEVEL)+(blvl('armoury')*STORAGE_CAP_PER_LEVEL.armoury),
+    mana:BASE_RESOURCE_MAX.mana+(citadelLvl*CITADEL_CAP_PER_LEVEL)+(blvl('manawell')*STORAGE_CAP_PER_LEVEL.manawell),
   };
 }
 
+function hasResearch(id){
+  return !!G.research[id]?.completed;
+}
+
+function currentAdminCap(){
+  return G.adminCap+Math.floor(blvl('citadel')/2)+(hasResearch('provincial_rule')?1:0);
+}
+
+function villageTributeResearchMultiplier(){
+  let mult=1;
+  if(hasResearch('guild_ledgers'))mult+=0.15;
+  if(hasResearch('provincial_rule'))mult+=0.10;
+  return mult;
+}
+
 function normalizeDerivedBuildingState(){
+  Object.entries(BASE_RESOURCE_RATE).forEach(([key,val])=>{
+    if(G.resources[key])G.resources[key].rate=val;
+  });
   const caps=expectedStorageCaps();
   Object.entries(caps).forEach(([key,val])=>{
-    if(G.resources[key])G.resources[key].max=Math.max(G.resources[key].max,val);
+    if(G.resources[key])G.resources[key].max=val;
   });
-  const hospitalLvl=blvl('hospital');
-  if(hospitalLvl>0){
-    G.hospital.capacity=Math.max(G.hospital.capacity,150+(hospitalLvl*150));
+  Object.entries(BUILDING_RATE_BONUS).forEach(([buildingId, bonus])=>{
+    const lvl=blvl(buildingId);
+    Object.entries(bonus).forEach(([key,val])=>{
+      G.resources[key].rate+=lvl*val;
+    });
+  });
+  if(hasResearch('trade_routes'))G.resources.gold.rate*=1.25;
+  if(hasResearch('crop_rotation'))G.resources.food.rate*=1.30;
+  if(hasResearch('stonemasons'))G.resources.stone.rate*=1.50;
+  if(hasResearch('banking')){
+    G.resources.gold.rate+=5;
+    G.resources.gold.max*=2;
   }
+  if(hasResearch('storehouses')){
+    Object.values(G.resources).forEach(r=>r.max=Math.floor(r.max*1.35));
+  }
+  if(hasResearch('guild_ledgers'))G.resources.gold.rate+=6;
+  if(hasResearch('runic_script'))G.resources.mana.rate+=1;
+  if(hasResearch('mana_reservoirs')){
+    G.resources.mana.rate+=2;
+    G.resources.mana.max+=400;
+  }
+  G.resources.gold.rate+=hasResearch('envoys')?10:0;
+  G.resources.gold.rate=Math.round(G.resources.gold.rate*10)/10;
+  G.resources.food.rate=Math.round(G.resources.food.rate*10)/10;
+  G.resources.wood.rate=Math.round(G.resources.wood.rate*10)/10;
+  G.resources.stone.rate=Math.round(G.resources.stone.rate*10)/10;
+  G.resources.iron.rate=Math.round(G.resources.iron.rate*10)/10;
+  G.resources.mana.rate=Math.round(G.resources.mana.rate*10)/10;
+
+  G.costReduction=hasResearch('trade_alliance')?0.85:null;
+  G.wardProtect=hasResearch('warding');
+  G.hasAlchemy=hasResearch('alchemy');
+  G.hasFarsight=hasResearch('farseeing');
+  G.hasSiege=hasResearch('siegecraft');
+  G.questTimeMulti=hasResearch('cavalry')?0.5:null;
+  G.fortBonus=hasResearch('fortification')?40:0;
+  G.prestigeRate=(blvl('citadel')*25)+(hasResearch('treaties')?20:0);
+  G.wallDefence=blvl('citadel')*50;
+  G.warChestCap=500+(blvl('citadel')*200);
+  G.watchtowerUnlocked=blvl('citadel')>=2;
+  if(blvl('tower')>0&&!G.unlockedResearchTabs.includes('arcane'))G.unlockedResearchTabs.push('arcane');
+  if(blvl('citadel')>0&&!G.unlockedResearchTabs.includes('diplomacy'))G.unlockedResearchTabs.push('diplomacy');
+  const hospitalLvl=blvl('hospital');
+  G.hospital.capacity=hospitalLvl>0?(150+(hospitalLvl*150)):100;
+  refreshResearchVisibility();
+  Object.values(G.resources).forEach(r=>{
+    r.amount=Math.min(r.amount,r.max);
+  });
 }
 
 function normalizeHeroes(){
   G.heroes=(G.heroes||[]).map(h=>{
     const maxHp=Math.max(100,h.maxHp||100);
     const level=Math.max(1,h.level||1);
+    const onQuest=!!h.onQuest;
     return {
       ...h,
       level,
       maxHp,
-      hp:Math.min(maxHp,Math.max(1,h.hp??maxHp)),
+      hp:onQuest?Math.min(maxHp,Math.max(1,h.hp??maxHp)):maxHp,
       assignment:h.assignment||'',
     };
   });
@@ -801,6 +876,14 @@ function totalAssignedHeroArmyBonus(){
   return G.heroes.reduce((sum,h)=>sum+((h.assignment==='army')?heroArmyBonusFor(h):0),0);
 }
 
+function heroCityDefenseBonusFor(h){
+  return 40+(h.level*12)+Math.round(h.power*1.5);
+}
+
+function totalAssignedCityHeroBonus(){
+  return G.heroes.reduce((sum,h)=>sum+((h.assignment==='city')?heroCityDefenseBonusFor(h):0),0);
+}
+
 function assignHeroToArmy(i){
   const h=G.heroes[i];
   if(!h)return;
@@ -812,11 +895,31 @@ function assignHeroToArmy(i){
   saveGame();
 }
 
+function assignHeroToCity(i){
+  const h=G.heroes[i];
+  if(!h)return;
+  if(h.onQuest){showSnot('Hero must return from quest first');return;}
+  h.assignment='city';
+  h.autoQuest=false;
+  addLog(`${h.name} is assigned to the city watch. Wall defence rises by ${heroCityDefenseBonusFor(h)}.`, 'important');
+  renderAll();
+  saveGame();
+}
+
 function releaseHeroFromArmy(i){
   const h=G.heroes[i];
   if(!h)return;
   h.assignment='';
   addLog(`${h.name} returns from army command and can quest again.`);
+  renderAll();
+  saveGame();
+}
+
+function releaseHeroFromCity(i){
+  const h=G.heroes[i];
+  if(!h)return;
+  h.assignment='';
+  addLog(`${h.name} returns from the city watch and can quest again.`);
   renderAll();
   saveGame();
 }
@@ -881,7 +984,8 @@ function calcLootCapacity(sent){
   const base=Object.entries(sent).reduce((sum,[type,qty])=>{
     return sum+(TROOP_DEF[type]?.carry||0)*qty;
   },0);
-  return Math.floor(base*(1+totalQuartermasterBonus()));
+  const logisticsBonus=hasResearch('campaign_logistics')?0.2:0;
+  return Math.floor(base*(1+totalQuartermasterBonus()+logisticsBonus));
 }
 
 function farmLootTotal(farm){
@@ -924,10 +1028,6 @@ function canSeeFarm(farm){
   return true;
 }
 
-function currentAdminCap(){
-  return G.adminCap+Math.floor(blvl('citadel')/2);
-}
-
 function governedVillageCount(){
   return Object.values(G.governedVillages||{}).filter(v=>v.governed).length;
 }
@@ -954,7 +1054,34 @@ function orcHordeUnlocked(){
 }
 
 function villageTributeMultiplier(){
-  return 1+(G.dynasty*0.05)+(G.victoryPath==='diplomatic'?0.15:0);
+  return (1+(G.dynasty*0.05)+(G.victoryPath==='diplomatic'?0.15:0))*villageTributeResearchMultiplier();
+}
+
+function cityGarrisonPower(){
+  const troopBonus=hasResearch('campaign_logistics')?1.1:1;
+  const troopPower=Object.entries(G.garrison||{}).reduce((sum,[type,qty])=>{
+    return sum+(((TROOP_DEF[type]?.atk||0)*qty)*troopBonus);
+  },0);
+  return Math.floor(troopPower);
+}
+
+function currentWallDefence(){
+  return (G.wallDefence||0)+totalWardenWallBonus()+cityGarrisonPower()+totalAssignedCityHeroBonus();
+}
+
+function refreshResearchVisibility(){
+  const visible=new Set(G.revealedResearch||[]);
+  ['trade_routes','crop_rotation','swordsmanship','fortification'].forEach(id=>visible.add(id));
+  allR().forEach(r=>{
+    if(G.research[r.id]?.completed)visible.add(r.id);
+    if(r.req&&G.research[r.req]?.completed)visible.add(r.id);
+  });
+  allR().forEach(r=>{
+    if(G.research[r.id]?.completed&&(r.unlocks||[]).length){
+      r.unlocks.forEach(id=>visible.add(id));
+    }
+  });
+  G.revealedResearch=[...visible];
 }
 
 function villageFocusOptions(farm){
@@ -1390,7 +1517,7 @@ function resolveFrontierPressure(){
     });
   }
   if(captured.length>=2){
-    const cityDef=(G.wallDefence||0)+totalWardenWallBonus()+Object.entries(G.garrison||{}).reduce((s,[type,qty])=>s+((TROOP_DEF[type]?.atk||0)*qty),0);
+    const cityDef=currentWallDefence();
     const cityAtk=350+(captured.length*180);
     if(cityDef<cityAtk){
       const stolen={};
@@ -1670,6 +1797,35 @@ function setAutoFarmFloor(farmId,val){
   G.autoFarm[farmId].floor=parseInt(val);
 }
 
+function powerBreakdown(){
+  const buildingPower=G.buildings.reduce((sum,b)=>sum+(b.level*90),0);
+  const researchPower=Object.values(G.research).filter(r=>r.completed).length*180;
+  const heroPower=G.heroes.reduce((sum,h)=>sum+(h.power*12),0);
+  const readyTroopPower=Object.entries(G.troops).reduce((sum,[type,t])=>sum+((TROOP_DEF[type]?.atk||0)*(t.available||0)),0);
+  const garrisonPower=cityGarrisonPower();
+  const frontierPower=G.npcFarms.reduce((sum,farm)=>sum+strongholdGarrisonPower(getVillageState(farm.id)),0);
+  const prestigePower=Math.floor(G.prestige*0.5);
+  return {
+    buildingPower,
+    researchPower,
+    heroPower,
+    readyTroopPower,
+    garrisonPower,
+    frontierPower,
+    prestigePower,
+  };
+}
+
+function showPowerBreakdown(){
+  const p=powerBreakdown();
+  const total=Object.values(p).reduce((sum,val)=>sum+val,0);
+  showOverlay(
+    `Buildings: ${Math.floor(p.buildingPower)}\nResearch: ${Math.floor(p.researchPower)}\nHeroes: ${Math.floor(p.heroPower)}\nReady troops: ${Math.floor(p.readyTroopPower)}\nCity garrison: ${Math.floor(p.garrisonPower)}\nFrontier garrisons: ${Math.floor(p.frontierPower)}\nRenown weight: ${Math.floor(p.prestigePower)}\nTotal: ${Math.floor(total)}`,
+    'success',
+    'Power Breakdown'
+  );
+}
+
 function launchAttack(farmId){
   const farm=G.npcFarms.find(f=>f.id===farmId);if(!farm)return;
   const sent={};
@@ -1684,12 +1840,8 @@ const allR=()=>[...RD.economy,...RD.military,...RD.arcane,...RD.diplomacy];
 
 // â”€â”€ POWER LEVEL â”€â”€
 function calcPower(){
-  const bPow=G.buildings.reduce((s,b)=>s+b.level*100,0);
-  const rPow=Object.values(G.research).filter(r=>r.completed).length*200;
-  const hPow=G.heroes.reduce((s,h)=>s+h.level*50,0);
-  const tPow=Object.values(G.troops).reduce((s,t)=>s+t.total,0);
-  const pPow=Math.floor(G.prestige);
-  return bPow+rPow+hPow+tPow+pPow;
+  const p=powerBreakdown();
+  return Math.floor(Object.values(p).reduce((sum,val)=>sum+val,0));
 }
 
 function renderPower(){
@@ -1868,6 +2020,7 @@ function init(){
   allR().forEach(r=>{ G.research[r.id]={completed:false}; });
   G.mapTiles=MAP_DEF.map(t=>({...t}));
   initCombat();
+  normalizeDerivedBuildingState();
   addLog('Your kingdom of Arnethia rises from humble beginnings.','important');
   addLog('Build farms and mills. Discover what lies ahead.');
 
@@ -1953,7 +2106,7 @@ function gameTick(){
   }
   // Secondary iron from quarry — 0.2/min per mine level
   const mineLvl=blvl('mine');
-  if(mineLvl>0&&G.tick%60===0) G.resources.iron.amount=Math.min(G.resources.iron.max, G.resources.iron.amount+(mineLvl*0.2));
+  if(mineLvl>0&&G.tick%60===0) G.resources.iron.amount=Math.min(G.resources.iron.max, G.resources.iron.amount+(mineLvl*0.1));
   if(G.tick%480===0)resolveFrontierPressure();
   if(G.tick%300===0){G.year++;addLog(`Year ${G.year} of the ${G.era}. The kingdom endures.`);}
   if(G.activeResearch){
@@ -2037,6 +2190,7 @@ function buildBuilding(id){
   if(!canAfford(costs)){showSnot('Insufficient resources');return;}
   spend(costs);bState.level=nl;bDef.onBuild(nl);G.prestige+=10*nl;G.cityDirty=true;
   if(bDef.unlocks)bDef.unlocks.forEach(uid=>revealB(uid));
+  normalizeDerivedBuildingState();
   addLog(`${bDef.name} upgraded to level ${nl}. ${bDef.eff(nl)}.`,'important');
   const mt=G.mapTiles.find(t=>t.id===id);if(mt)mt.built=true;
   showOverlay(`${bDef.icon} ${bDef.name} — Level ${nl}\n${bDef.eff(nl)}`,'success','Constructed');
@@ -2059,6 +2213,7 @@ function completeResearch(rDef){
   G.research[rDef.id].completed=true;G.activeResearch=null;G.researchProgress=0;
   applyResearchEffect(rDef);G.prestige+=30;
   if(rDef.unlocks)revealR(rDef.unlocks);
+  normalizeDerivedBuildingState();
   addLog(`Research complete: ${rDef.name}.`,'important');
   showOverlay(`${rDef.name} complete!`,'success','Research Done');
   setBadge('research',G.activeTab!=='research');
@@ -2074,6 +2229,7 @@ function completeResearchQueue2(rDef,mode='queue 2'){
   G.activeResearch2=null;G.researchProgress2=0;
   applyResearchEffect(rDef);G.prestige+=30;
   if(rDef.unlocks)revealR(rDef.unlocks);
+  normalizeDerivedBuildingState();
   addLog(`Research complete (${mode}): ${rDef.name}.`,'important');
   showOverlay(`✦ ${rDef.name} complete`,'success','Research');
   setBadge('research',G.activeTab!=='research');
@@ -2099,6 +2255,7 @@ function spawnHero(){
 function sendOnQuest(i){
   const h=G.heroes[i];if(!h||h.onQuest)return;
   if(h.assignment==='army'){showSnot('Withdraw this hero from the army first');return;}
+  if(h.assignment==='city'){showSnot('Withdraw this hero from city defence first');return;}
   const avail=QUESTS.filter(q=>h.power>=q.minP);
   if(!avail.length){showSnot('Hero too weak for available quests');return;}
   const q=avail[Math.floor(Math.random()*avail.length)];
@@ -2109,7 +2266,7 @@ function sendOnQuest(i){
 }
 
 function sendHeroOnBestQuest(h){
-  if(!h||h.onQuest||h.level>=HERO_LEVEL_CAP||h.assignment==='army')return false;
+  if(!h||h.onQuest||h.level>=HERO_LEVEL_CAP||h.assignment==='army'||h.assignment==='city')return false;
   const avail=QUESTS.filter(q=>h.power>=q.minP);
   if(!avail.length)return false;
   const q=avail[avail.length-1];
@@ -2122,8 +2279,8 @@ function sendHeroOnBestQuest(h){
 function toggleHeroAutoQuest(i){
   const h=G.heroes[i];
   if(!h)return;
-  if(h.assignment==='army'){
-    showSnot('Withdraw this hero from the army to auto-quest');
+  if(h.assignment==='army'||h.assignment==='city'){
+    showSnot('Withdraw this hero from command duty to auto-quest');
     return;
   }
   h.autoQuest=!h.autoQuest;
@@ -2289,7 +2446,7 @@ function effectiveResourceRate(key){
   const rally=G._rallied&&G.tick<=G._rallyEnd;
   const harvestBoost=isManaBuffActive('harvest')?1.5:1;
   let gain=(r.rate||0)*earlyBoost()*(rally?2:1)*harvestBoost;
-  if(key==='iron')gain+=blvl('mine')*0.2;
+  if(key==='iron')gain+=blvl('mine')*0.1;
   gain+=totalVillageTributePerMinute()[key]||0;
   return gain;
 }
@@ -2555,7 +2712,7 @@ function renderResearch(){
         ${canQ2?`<button onclick="startResearch2('${rDef.id}')" style="font-size:8px;padding:2px 5px;background:rgba(74,122,50,.15);border:1px solid rgba(74,122,50,.3);border-radius:2px;color:var(--forest-light);cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.5px;touch-action:manipulation">+Q2</button>`:''}
       </div>
       <div class="rdesc">${rDef.desc}</div>
-      ${locked?`<div style="font-size:11px;color:var(--blood-light);font-style:italic">Requires: ${rDef.req}</div>`:''}
+      ${locked?`<div style="font-size:11px;color:var(--blood-light);font-style:italic">Requires: ${allR().find(x=>x.id===rDef.req)?.name||rDef.req}</div>`:''}
       ${!done&&!locked?`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${cHtml}<span style="font-size:11px;color:var(--stone-light)">· ${Math.round(rDef.time/60)} min</span></div>`:''}
       ${isAct?`<div class="rprog"><div class="rprog-inner" style="width:${prog}%"></div></div>`:''}
       ${isAct2?`<div class="rprog"><div class="rprog-inner" style="width:${q2Pct}%;background:var(--forest-light)"></div></div>`:''}
@@ -2571,14 +2728,17 @@ function renderHeroes(){
     const avail=QUESTS.filter(q=>h.power>=q.minP);
     const bestQuest=avail[avail.length-1];
     const inArmy=h.assignment==='army';
+    const inCity=h.assignment==='city';
     const armyBonus=Math.round(heroArmyBonusFor(h)*100);
+    const cityBonus=heroCityDefenseBonusFor(h);
     let status='Resting in the keep',sc='';
     if(h.onQuest){const m=Math.ceil(h.qt/60);status=`On quest: ${h.qname} (~${m}m)`;sc='onq';}
     else if(inArmy){status=`Assigned to the field army (+${armyBonus}% army power)`;sc='ret';}
+    else if(inCity){status=`Assigned to city defence (+${cityBonus} wall defence)`;sc='ret';}
     else if(h.level>=HERO_LEVEL_CAP){status=`At level cap (${HERO_LEVEL_CAP})`;sc='ret';}
     return`<div class="hcard">
-      <div class="hname">⚔ ${h.name}</div>
-      <div class="hclass">${h.cls} · Level ${h.level}/${HERO_LEVEL_CAP}</div>
+      <div class="hname">Hero: ${h.name}</div>
+      <div class="hclass">${h.cls} - Level ${h.level}/${HERO_LEVEL_CAP}</div>
       <div class="hstats">
         <div class="hstat"><div class="hstat-v">${h.power}</div><div class="hstat-l">Power</div></div>
         <div class="hstat"><div class="hstat-v">${h.hp}</div><div class="hstat-l">HP</div></div>
@@ -2587,18 +2747,21 @@ function renderHeroes(){
       <div style="font-size:10px;color:var(--stone-light);margin-bottom:3px">XP ${h.xp}/${h.xpGoal}</div>
       <div class="hxp"><div class="hxp-i" style="width:${xpP}%"></div></div>
       <div class="hstatus ${sc}">${status}</div>
-      ${bestQuest&&!h.onQuest&&!inArmy?`<div style="font-size:10px;color:var(--stone-light);font-style:italic;margin-bottom:5px">Possible reward: ${questRewardText(bestQuest)}</div>`:''}
+      ${bestQuest&&!h.onQuest&&!inArmy&&!inCity?`<div style="font-size:10px;color:var(--stone-light);font-style:italic;margin-bottom:5px">Possible reward: ${questRewardText(bestQuest)}</div>`:''}
       <div class="hero-actions">
-        <button class="qbtn ${h.onQuest?'ret':''}" onclick="${h.onQuest?'':(`sendOnQuest(${i})`)}" ${h.onQuest||inArmy||!avail.length||h.level>=HERO_LEVEL_CAP?'disabled':''} style="flex:1">
-          ${h.onQuest?'⏳ On Quest':(inArmy?'⚔ In Army':(avail.length?`⚔ Quest (${avail.length})`:'⚠ Too Weak'))}
+        <button class="qbtn ${h.onQuest?'ret':''}" onclick="${h.onQuest?'':(`sendOnQuest(${i})`)}" ${h.onQuest||inArmy||inCity||!avail.length||h.level>=HERO_LEVEL_CAP?'disabled':''} style="flex:1">
+          ${h.onQuest?'On Quest':(inArmy?'In Army':(inCity?'On Watch':(avail.length?`Quest (${avail.length})`:'Too Weak')))}
         </button>
-        <button class="qbtn hero-auto-btn ${h.autoQuest?'ret':''}" onclick="toggleHeroAutoQuest(${i})" ${h.level>=HERO_LEVEL_CAP||inArmy?'disabled':''}>
-          ${h.autoQuest?'↻ Auto On':'Auto'}
+        <button class="qbtn hero-auto-btn ${h.autoQuest?'ret':''}" onclick="toggleHeroAutoQuest(${i})" ${h.level>=HERO_LEVEL_CAP||inArmy||inCity?'disabled':''}>
+          ${h.autoQuest?'Auto On':'Auto'}
         </button>
       </div>
       <div class="hero-actions" style="margin-top:6px">
-        <button class="qbtn ${inArmy?'ret':''}" onclick="${inArmy?`releaseHeroFromArmy(${i})`:`assignHeroToArmy(${i})`}" ${h.onQuest?'disabled':''} style="flex:1">
-          ${inArmy?'↩ Withdraw from Army':`🛡 Assign to Army (+${armyBonus}%)`}
+        <button class="qbtn ${inArmy?'ret':''}" onclick="${inArmy?`releaseHeroFromArmy(${i})`:`assignHeroToArmy(${i})`}" ${h.onQuest||inCity?'disabled':''} style="flex:1">
+          ${inArmy?'Withdraw from Army':`Assign to Army (+${armyBonus}%)`}
+        </button>
+        <button class="qbtn ${inCity?'ret':''}" onclick="${inCity?`releaseHeroFromCity(${i})`:`assignHeroToCity(${i})`}" ${h.onQuest||inArmy?'disabled':''} style="flex:1">
+          ${inCity?'Leave City Watch':`City Defence (+${cityBonus})`}
         </button>
       </div>
     </div>`;
@@ -2613,6 +2776,7 @@ function renderFaction(){
   const tribute=totalVillageTributePerMinute();
   const governed=G.npcFarms.filter(f=>getVillageState(f.id).governed);
   const assignedArmyHeroes=G.heroes.filter(h=>h.assignment==='army');
+  const assignedCityHeroes=G.heroes.filter(h=>h.assignment==='city');
   const activeManaBuffs=MANA_ABILITIES.filter(a=>isManaBuffActive(a.id));
   const strongholds=G.npcFarms.filter(isStronghold);
   const capturedSites=capturedStrongholds();
@@ -2649,7 +2813,7 @@ function renderFaction(){
 
     <div class="section">
       <div class="section-title">👑 Realm Expansion</div>
-      <div class="ftrait"><div class="ftrait-name">Administration</div><div class="ftrait-desc">${governedVillageCount()} / ${currentAdminCap()} governed villages. Base capacity ${G.adminCap}, Citadel adds ${Math.floor(blvl('citadel')/2)}.</div></div>
+      <div class="ftrait"><div class="ftrait-name">Administration</div><div class="ftrait-desc">${governedVillageCount()} / ${currentAdminCap()} governed villages. Base capacity ${G.adminCap}, Citadel adds ${Math.floor(blvl('citadel')/2)}, and Provincial Rule adds ${hasResearch('provincial_rule')?1:0}.</div></div>
       <div class="ftrait"><div class="ftrait-name">Passive Tribute per Hour</div><div class="ftrait-desc">${Object.keys(tribute).length?tributeRateString(tribute,true).replace(/ /g,' · '):'No villages are paying tribute yet.'}</div></div>
       <div class="ftrait"><div class="ftrait-name">Governed Villages</div><div class="ftrait-desc">${governed.length?governed.map(f=>`${f.icon} ${f.name}`).join(' · '):'None yet. Win repeated raids to fill control, then crown the village from Combat.'}</div></div>
       <div class="ftrait"><div class="ftrait-name">Governor Corps</div><div class="ftrait-desc">${governed.length?`Stewards boost tribute, Wardens add ${totalWardenWallBonus()} wall defence, and Quartermasters add ${Math.round(totalQuartermasterBonus()*100)}% raid carry capacity.`:'No governors assigned yet.'}</div></div>
@@ -2666,13 +2830,19 @@ function renderFaction(){
     <div class="section">
       <div class="section-title">🛡 Kingdom Defence</div>
       <div class="defence-card">
-        <div class="def-row"><span class="def-title">Wall Defence</span><span class="def-val">${(G.wallDefence||0)+totalWardenWallBonus()}</span></div>
-        <div class="def-bar"><div class="def-fill" style="width:${Math.min(100,(((G.wallDefence||0)+totalWardenWallBonus())/500)*100)}%"></div></div>
+        <div class="def-row"><span class="def-title">Wall Defence</span><span class="def-val">${currentWallDefence()}</span></div>
+        <div class="def-bar"><div class="def-fill" style="width:${Math.min(100,(currentWallDefence()/1200)*100)}%"></div></div>
+        <div style="font-size:11px;color:var(--stone-light);margin-top:6px;line-height:1.45">
+          Base walls ${G.wallDefence||0} ? Wardens +${totalWardenWallBonus()} ? Garrison +${cityGarrisonPower()} ? City heroes +${totalAssignedCityHeroBonus()}
+        </div>
         <div style="font-size:11px;color:var(--stone-light);margin-top:6px;font-style:italic">
           ${G.watchtowerUnlocked?'✓ Watchtower active — raid warnings enabled':'Build Citadel Lv2 to unlock Watchtower'}
         </div>
         <div style="font-size:11px;color:var(--stone-light);margin-top:4px;font-style:italic">
           Garrison: ${Object.entries(G.garrison||{}).filter(([,v])=>v>0).map(([k,v])=>`${TROOP_DEF[k]?.icon||k}${v}`).join(' ')||'None assigned'}
+        </div>
+        <div style="font-size:11px;color:var(--stone-light);margin-top:4px;font-style:italic">
+          City heroes: ${assignedCityHeroes.length?assignedCityHeroes.map(h=>`${h.name} (+${heroCityDefenseBonusFor(h)})`).join(' ? '):'None assigned'}
         </div>
         <div class="garrison-grid" style="margin-top:8px">
           ${['infantry','archers','cavalry'].map(type=>`
@@ -2857,6 +3027,12 @@ window.addEventListener('DOMContentLoaded', function(){
     document.body.appendChild(div);
   }
 });
+
+
+
+
+
+
 
 
 
