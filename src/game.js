@@ -346,7 +346,7 @@ async function applyOfflineProgress(sinceTime=null){
   const boost=earlyBoost();
   const ticks=Math.floor(elapsed);
 
-  // â”€â”€ ADVANCE G.tick first — this fixes ALL absolute-tick timers â”€â”€
+  // ==== ADVANCE G.tick first - this fixes ALL absolute-tick timers ====
   // Troop training, hospital, raids, respawns all use G.tick comparisons
   G.tick+=ticks;
 
@@ -441,7 +441,7 @@ async function handleAppForeground(){
   saveGame();
 }
 
-// â”€â”€ VICTORY PATHS â”€â”€
+// ==== VICTORY PATHS ====
 function checkVictoryPath(){
   const completed=Object.entries(VICTORY_PATHS).filter(([,path])=>path.check());
   if(!completed.length)return;
@@ -459,7 +459,7 @@ function checkVictoryPath(){
   }
 }
 
-// â”€â”€ PRESTIGE SPENDING â”€â”€
+// ==== PRESTIGE SPENDING ====
 function spendPrestige(ability){
   if(G.prestigePoints<ability.cost){showSnot('Not enough prestige points');return;}
   if(G.tick-ability.lastUsed<ability.cooldown){
@@ -473,7 +473,7 @@ function spendPrestige(ability){
   renderAll();
 }
 
-// â”€â”€ SEASON STRUCTURE â”€â”€
+// ==== SEASON STRUCTURE ====
 
 function seasonTick(ticks=1){
   if(G.seasonComplete)return;
@@ -786,7 +786,7 @@ function releaseHeroFromCity(i){
   saveGame();
 }
 
-// â”€â”€ TROOP TRAINING â”€â”€
+// ==== TROOP TRAINING ====
 function trainTroops(type,qty){
   const def=TROOP_DEF[type];
   if(!def)return;
@@ -825,7 +825,7 @@ function checkTraining(){
   });
 }
 
-// â”€â”€ NPC FARM ATTACK â”€â”€
+// ==== NPC FARM ATTACK ====
 function calcAttackPower(sent){
   const base=Object.entries(sent).reduce((sum,[type,qty])=>{
     return sum+(TROOP_DEF[type]?.atk||0)*qty;
@@ -1316,7 +1316,7 @@ function resolveRaid(raid){
   renderCombat();
 }
 
-// â”€â”€ HOSPITAL RECOVERY â”€â”€
+// ==== HOSPITAL RECOVERY ====
 function recoverInjured(count){
   const hospitalLvl=blvl('hospital')||0;
   const cap=50+(hospitalLvl*50);
@@ -1399,7 +1399,7 @@ function resolveFrontierPressure(){
   }
 }
 
-// â”€â”€ RENDER COMBAT â”€â”€
+// ==== RENDER COMBAT ====
 function renderCombat(){
   const tab=document.getElementById('tab-combat');if(!tab)return;
   const scrollTop=tab.scrollTop;
@@ -1700,7 +1700,7 @@ function launchAttack(farmId){
 
 const allR=()=>[...RD.economy,...RD.military,...RD.arcane,...RD.diplomacy];
 
-// â”€â”€ POWER LEVEL â”€â”€
+// ==== POWER LEVEL ====
 function calcPower(){
   const p=powerBreakdown();
   return Math.floor(Object.values(p).reduce((sum,val)=>sum+val,0));
@@ -1712,7 +1712,7 @@ function renderPower(){
   if(el) el.textContent=p.toLocaleString();
 }
 
-// â”€â”€ FLOATING RESOURCE BAR â”€â”€
+// ==== FLOATING RESOURCE BAR ====
 function renderResourceBar(){
   const el=document.getElementById('resource-bar-inner');if(!el)return;
   el.innerHTML=Object.entries(G.resources).map(([k,r],i)=>{
@@ -1733,7 +1733,7 @@ function renderResourceBar(){
   }).join('');
 }
 
-// â”€â”€ WAR CHEST â”€â”€
+// ==== WAR CHEST ====
 function renderWarChest(){
   return`<div class="warchest-card">
     <div class="wc-header">
@@ -1779,7 +1779,7 @@ function warChestDecayTick(){
   }
 }
 
-// â”€â”€ AUTO-FARM â”€â”€
+// ==== AUTO-FARM ====
 function toggleAutoFarm(farmId){
   if(!G.autoFarm[farmId]) G.autoFarm[farmId]={enabled:false,floor:20};
   G.autoFarm[farmId].enabled=!G.autoFarm[farmId].enabled;
@@ -1834,7 +1834,7 @@ function checkAutoFarm(){
   });
 }
 
-// â”€â”€ DUAL RESEARCH QUEUE â”€â”€
+// ==== DUAL RESEARCH QUEUE ====
 function startResearch2(id){
   if(blvl('citadel')<3){showSnot('Second queue unlocks at Citadel level 3');return;}
   if(G.activeResearch2){showSnot('Second queue busy');return;}
@@ -1870,13 +1870,13 @@ function unlockTab(tab){
 const bviz=id=>G.revealedBuildings.includes(id);
 const rviz=id=>G.revealedResearch.includes(id);
 
-// â”€â”€ HELPERS â”€â”€
+// ==== HELPERS ====
 function canAfford(costs){return Object.entries(costs).every(([r,a])=>G.resources[r]?.amount>=a);}
 function spend(costs){Object.entries(costs).forEach(([r,a])=>{G.resources[r].amount-=a;});}
 function blvl(id){return G.buildings.find(b=>b.id===id)?.level||0;}
 function chkReq(bDef){if(!bDef.req)return true;return Object.entries(bDef.req).every(([id,l])=>blvl(id)>=l);}
 
-// â”€â”€ INIT â”€â”€
+// ==== INIT ====
 function init(){
   BD.forEach(b=>G.buildings.push({id:b.id,level:0}));
   allR().forEach(r=>{ G.research[r.id]={completed:false}; });
@@ -1937,7 +1937,7 @@ function tabTouchHandler(e){
   if(tab) switchTab(tab);
 }
 
-// â”€â”€ TICK â”€â”€
+// ==== TICK ====
 function gameTick(){
   const reliableNow=getReliableNow();
   const lastActive=G.lastActiveTime||G.lastSaveTime||reliableNow;
@@ -1999,7 +1999,7 @@ function gameTick(){
   updateBadges();
 }
 
-// â”€â”€ TABS â”€â”€
+// ==== TABS ====
 function switchTab(tab){
   G.activeTab=tab;
   document.querySelectorAll('.tab-view').forEach(v=>v.classList.remove('active'));
@@ -2012,7 +2012,7 @@ function switchTab(tab){
   if(tab==='combat')renderCombat();
 }
 
-// â”€â”€ BADGES â”€â”€
+// ==== BADGES ====
 function updateBadges(){
   const anyBuild=BD.some(b=>{
     if(!bviz(b.id))return false;
@@ -2039,7 +2039,7 @@ function clearBadge(tab){
   if(tab==='heroes')G.heroes.forEach(h=>h._ret=false);
 }
 
-// â”€â”€ BUILD â”€â”€
+// ==== BUILD ====
 function buildBuilding(id){
   const bDef=BD.find(b=>b.id===id);
   const bState=G.buildings.find(b=>b.id===id);
@@ -2059,7 +2059,7 @@ function buildBuilding(id){
   renderAll();
 }
 
-// â”€â”€ RESEARCH â”€â”€
+// ==== RESEARCH ====
 function startResearch(id){
   if(G.activeResearch){showSnot('Already researching');return;}
   if(G.research[id]?.completed)return;
@@ -2103,7 +2103,7 @@ function switchResearchTab(tab){
   renderResearch();
 }
 
-// â”€â”€ HEROES â”€â”€
+// ==== HEROES ====
 function spawnHero(){
   const used=G.heroes.map(h=>h.name);
   const avail=HERO_NAMES.filter(n=>!used.includes(n));
@@ -2201,14 +2201,14 @@ function completeQuest(h){
   renderAll();
 }
 
-// â”€â”€ LOG â”€â”€
+// ==== LOG ====
 function addLog(msg,type){
   G.log.unshift({msg,type,time:`Yr.${G.year}`});
   if(G.log.length>40)G.log.pop();
   G.logDirty=true;
 }
 
-// â”€â”€ OVERLAYS â”€â”€
+// ==== OVERLAYS ====
 function showOverlay(msg,type='',title=''){
   const s=document.getElementById('overlay-stack');
   const el=document.createElement('div');
@@ -2222,7 +2222,7 @@ function showSnot(msg,duration=2500){
   document.body.appendChild(el);setTimeout(()=>el.remove(),duration);
 }
 
-// â”€â”€ RENDER â”€â”€
+// ==== RENDER ====
 function renderAll(){
   renderResourceBar();
   renderPower();
@@ -2433,7 +2433,7 @@ function toggleMaxedBuildings(){
   saveGame();
 }
 
-// â”€â”€ ISOMETRIC CITY VIEW â”€â”€
+// ==== ISOMETRIC CITY VIEW ====
 let _popupBuildingId=null;
 
 function renderMap(){
@@ -2460,7 +2460,7 @@ function renderMap(){
     <div class="city-zones">${zones}</div>`;
 }
 
-// â”€â”€ BUILDING POPUP â”€â”€
+// ==== BUILDING POPUP ====
 function openBuildingPopup(id){
   const bDef=BD.find(b=>b.id===id);if(!bDef)return;
   const lvl=blvl(id);
@@ -2841,7 +2841,7 @@ function renderPrestige(){
   document.getElementById('prestige-val').textContent=`${Math.floor(G.prestige)}/${G.prestigeGoal}`;
 }
 
-// â”€â”€ TICK TIMER â”€â”€
+// ==== TICK TIMER ====
 let _rStart=null;
 function animateTickBar(ts){
   if(!_rStart)_rStart=ts;
@@ -2856,7 +2856,7 @@ function animateTickBar(ts){
 }
 
 
-// â”€â”€ GLOBAL ERROR HANDLER â”€â”€
+// ==== GLOBAL ERROR HANDLER ====
 // Shows JS errors visibly on mobile where there's no console
 window.onerror=function(msg,src,line,col,err){
   const div=document.createElement('div');
