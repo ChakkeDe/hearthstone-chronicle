@@ -1,6 +1,10 @@
 // Save, load, and cloud persistence helpers.
 
 const SAVE_VERSION = 1;
+const LOCAL_SAVE_KEYS = ['hc4', 'hc3'];
+const LOCAL_RESET_SENTINEL = 'hc_local_reset_pending';
+
+let _suspendPersistence = false;
 
 function isPlainObject(value){
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -26,6 +30,28 @@ function derivePrestigeGoal(savedDynasty, savedPrestigeGoal){
 
 function safeSaveObject(raw){
   return isPlainObject(raw) ? raw : null;
+}
+
+function clearPersistedLocalSaveData(){
+  try{
+    LOCAL_SAVE_KEYS.forEach(key=>localStorage.removeItem(key));
+  }catch(e){}
+}
+
+function markPendingLocalReset(){
+  try{
+    sessionStorage.setItem(LOCAL_RESET_SENTINEL, '1');
+  }catch(e){}
+}
+
+function consumePendingLocalReset(){
+  try{
+    const pending = sessionStorage.getItem(LOCAL_RESET_SENTINEL) === '1';
+    if(pending) sessionStorage.removeItem(LOCAL_RESET_SENTINEL);
+    return pending;
+  }catch(e){
+    return false;
+  }
 }
 
 function sanitizeResourceSnapshot(savedResources){
@@ -95,6 +121,7 @@ function sanitizeManaBuffs(savedManaBuffs){
 }
 
 async function cloudSave(){
+  if(_suspendPersistence) return;
   if(!G.supabaseUrl || !G.supabaseKey) return;
   try{
     const payload = buildSavePayload();
@@ -115,6 +142,7 @@ async function cloudSave(){
 }
 
 async function cloudLoad(){
+  if(_suspendPersistence) return false;
   if(!G.supabaseUrl || !G.supabaseKey) return false;
   try{
     await fetchServerTime();
@@ -335,6 +363,7 @@ function mergeSavedNpcFarms(savedFarms){
 }
 
 function saveGame(){
+  if(_suspendPersistence) return;
   G.lastSaveTime = getReliableNow();
   G.lastServerTime = G.lastSaveTime;
   try{
@@ -344,7 +373,7 @@ function saveGame(){
 
 function loadGame(){
   try{
-    const raw = localStorage.getItem('hc4') || localStorage.getItem('hc3');
+    const raw = LOCAL_SAVE_KEYS.map(key=>localStorage.getItem(key)).find(Boolean);
     if(!raw) return;
     const parsed = safeSaveObject(JSON.parse(raw));
     if(!parsed) return;
@@ -356,9 +385,14 @@ function loadGame(){
 function clearLocalSave(){
   const ok = window.confirm('Clear your local save and restart from a fresh kingdom? This cannot be undone.');
   if(!ok) return;
-  try{
-    localStorage.removeItem('hc4');
-    localStorage.removeItem('hc3');
-  }catch(e){}
-  window.location.reload();
+  // Suspend autosave/cloud sync first so pagehide cannot write the old kingdom back.
+  _suspendPersistence = true;
+  if(typeof _offlineReady !== 'undefined') _offlineReady = false;
+  if(typeof G !== 'undefined'){
+    G.supabaseUrl = '';
+    G.supabaseKey = '';
+  }
+  clearPersistedLocalSaveData();
+  markPendingLocalReset();
+  window.location.replace(window.location.href);
 }

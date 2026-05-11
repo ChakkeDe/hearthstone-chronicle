@@ -103,8 +103,8 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '1.2.3';
-const CACHE_VERSION = 'hc-v45';
+const APP_VERSION = '1.2.4';
+const CACHE_VERSION = 'hc-v46';
 const RELIC_STACK_CAP = 5;
 
 const BASE_RESOURCE_MAX={gold:900,food:900,wood:900,stone:900,iron:600,mana:400};
@@ -1930,6 +1930,7 @@ function chkReq(bDef){if(!bDef.req)return true;return Object.entries(bDef.req).e
 
 // ==== INIT ====
 function init(){
+  const pendingLocalReset=consumePendingLocalReset();
   BD.forEach(b=>G.buildings.push({id:b.id,level:0}));
   allR().forEach(r=>{ G.research[r.id]={completed:false}; });
   G.mapTiles=MAP_DEF.map(t=>({...t}));
@@ -1957,6 +1958,15 @@ function init(){
   });
   window.addEventListener('pagehide',handleAppBackground);
   window.addEventListener('pageshow',e=>{if(e.persisted)handleAppForeground();});
+  if(pendingLocalReset){
+    // A local reset was requested on the previous page instance. Purge again
+    // defensively and skip load sources so the next kingdom always starts fresh.
+    clearPersistedLocalSaveData();
+    G._tickAtLastLoad=G.tick;
+    _offlineReady=true;
+    renderAll();
+    return;
+  }
   cloudLoad().then(loaded=>{
     if(!loaded){
       loadGame();
