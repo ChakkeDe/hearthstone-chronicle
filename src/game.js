@@ -103,8 +103,8 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '1.1.0';
-const CACHE_VERSION = 'hc-v40';
+const APP_VERSION = '1.1.1';
+const CACHE_VERSION = 'hc-v41';
 const RELIC_STACK_CAP = 5;
 
 const BASE_RESOURCE_MAX={gold:500,food:500,wood:500,stone:500,iron:300,mana:200};
@@ -679,6 +679,7 @@ function applyLoadedState(s){
   (s.buildings||[]).forEach(b=>{const g=G.buildings.find(x=>x.id===b.id);if(g)g.level=b.level;});
   Object.assign(G.research,s.research||{});
   G.heroes=s.heroes||[];
+  normalizeHeroes();
   G.activeResearch=s.activeResearch||null;G.researchProgress=s.researchProgress||0;G.tick=s.tick||0;
   if(s.revealedBuildings)G.revealedBuildings=s.revealedBuildings;
   if(s.revealedResearch)G.revealedResearch=s.revealedResearch;
@@ -749,6 +750,20 @@ function normalizeDerivedBuildingState(){
   if(hospitalLvl>0){
     G.hospital.capacity=Math.max(G.hospital.capacity,150+(hospitalLvl*150));
   }
+}
+
+function normalizeHeroes(){
+  G.heroes=(G.heroes||[]).map(h=>{
+    const maxHp=Math.max(100,h.maxHp||100);
+    const level=Math.max(1,h.level||1);
+    return {
+      ...h,
+      level,
+      maxHp,
+      hp:Math.min(maxHp,Math.max(1,h.hp??maxHp)),
+      assignment:h.assignment||'',
+    };
+  });
 }
 
 function initCombat(){
@@ -2128,8 +2143,11 @@ function questRewardText(q){
 
 function completeQuest(h){
   const q=h.qDef;
+  const maxHp=h.maxHp||100;
+  let returnedWounded=false;
   if(Math.random()<q.danger&&!G.wardProtect){
     h.hp=Math.max(1,h.hp-30);
+    returnedWounded=true;
     addLog(`⚠ ${h.name} returns wounded!`,'danger');
     showOverlay(`${h.name} returns wounded from ${q.name}.`,'danger','Hero Injured');
   } else if(Math.random()<q.danger&&G.wardProtect){
@@ -2144,6 +2162,11 @@ function completeQuest(h){
     showOverlay(`${h.name} reached Level ${h.level}!\nPower now: ${h.power}`,'success','Level Up!');
   }else if(h.level>=HERO_LEVEL_CAP){
     h.xp=Math.min(h.xp,h.xpGoal);
+  }
+  if(returnedWounded){
+    const healAmount=maxHp-h.hp;
+    h.hp=maxHp;
+    if(healAmount>0)addLog(`${h.name} recovers back to full strength in the keep.`,'important');
   }
   h.onQuest=false;h.qt=0;h.qname='';h._ret=true;
   G.prestige+=15;
