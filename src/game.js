@@ -15,11 +15,11 @@ const G={
   lastActiveTime: Date.now(), // last real game tick timestamp for AFK calculation
   offlineCapHours:12,
   resources:{
-    gold: {amount:150, rate:2,  max:500, icon:'🪙',name:'Gold'},
-    food: {amount:200, rate:3,  max:500, icon:'🌾',name:'Food'},
-    wood: {amount:180, rate:3,  max:500, icon:'🪵',name:'Wood'},
-    stone:{amount:120, rate:2,  max:500, icon:'⚙', name:'Stone'},
-    iron: {amount:15, rate:1,  max:300,icon:'⛏', name:'Iron'},
+    gold: {amount:110, rate:2,  max:500, icon:'🪙',name:'Gold'},
+    food: {amount:140, rate:3,  max:500, icon:'🌾',name:'Food'},
+    wood: {amount:120, rate:3,  max:500, icon:'🪵',name:'Wood'},
+    stone:{amount:80, rate:2,  max:500, icon:'⚙', name:'Stone'},
+    iron: {amount:0, rate:1,  max:300,icon:'⛏', name:'Iron'},
     mana: {amount:0, rate:0,max:200,icon:'✨',name:'Mana'},
   },
   buildings:[],research:{},heroes:[],
@@ -79,7 +79,7 @@ const G={
 function earlyBoost(){
   // Tapers from 5x at 0 buildings to 1x at 25 total levels - much slower fade
   const t=G.buildings.reduce((s,b)=>s+b.level,0);
-  return Math.max(1, 3.2-(t*0.12));
+  return Math.max(1, 2.25-(t*0.10));
 }
 
 function researchSpeedMultiplier(){
@@ -114,7 +114,7 @@ const BUILDING_RATE_BONUS={
   lumber:{wood:2},
   mine:{stone:2},
   market:{gold:3},
-  ironworks:{iron:2},
+  ironworks:{iron:1.25},
   tower:{mana:2},
 };
 const CITADEL_CAP_PER_LEVEL=700;
@@ -2784,6 +2784,18 @@ function renderFaction(){
           </button>
         </div>`;
       }).join('')}
+    </div>
+
+    <div class="section">
+      <div class="section-title">Save Data</div>
+      <div class="ftrait">
+        <div class="ftrait-name">Local Chronicle</div>
+        <div class="ftrait-desc">Clear the save on this device and restart from a fresh kingdom if you want a clean early-game test.</div>
+      </div>
+      <button onclick="clearLocalSave()"
+        style="width:100%;padding:8px;background:rgba(138,45,45,.12);border:1px solid rgba(138,45,45,.4);border-radius:4px;color:var(--blood-light);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer">
+        Clear Local Save
+      </button>
     </div>
 
     <div class="section">

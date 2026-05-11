@@ -21,9 +21,9 @@ const BD = [
     onBuild: l => { G.resources.gold.rate += 3; }, unlocks: ['ironworks'] },
 
   { id: 'ironworks', name: 'Iron Foundry', icon: '🔥', max: 12, tier: 2, desc: 'Fire and hammer shape the future of war.',
-    eff: l => `+${l * 2} iron/min`,
+    eff: l => `+${l * 1.25} iron/min`,
     cost: l => ({ stone: bCost(15, l), gold: bCost(12, l), wood: bCost(8, l) }),
-    onBuild: l => { G.resources.iron.rate += 2; },
+    onBuild: l => { G.resources.iron.rate += 1.25; },
     req: { mine: 1 }, unlocks: ['tower', 'barracks'] },
 
   { id: 'tower', name: 'Mage Tower', icon: '🗼', max: 10, tier: 3, desc: 'Ancient ley lines channel arcane power.',
@@ -36,7 +36,7 @@ const BD = [
     eff: l => `+${l * 10}% hero combat power`,
     cost: l => ({ wood: bCost(25, l), stone: bCost(18, l), iron: bCost(5, l) }),
     onBuild: l => { if (l === 1) spawnHero(); if (l === 3) spawnHero(); if (l === 6) spawnHero(); },
-    req: { ironworks: 1 }, unlocks: ['citadel', 'hospital'] },
+    req: { ironworks: 1, market: 1 }, unlocks: ['citadel', 'hospital'] },
 
   { id: 'citadel', name: 'Royal Citadel', icon: '🏰', max: 8, tier: 4, desc: 'The seat of power. Expands caps, unlocks diplomacy and defence.',
     eff: l => `+${l * 700} caps, +${l * 25} prestige/min, +${l * 50} wall defence`,

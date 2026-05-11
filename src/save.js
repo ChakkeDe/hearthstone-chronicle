@@ -1,10 +1,104 @@
 // Save, load, and cloud persistence helpers.
 
+const SAVE_VERSION = 1;
+
+function isPlainObject(value){
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function asFiniteNumber(value, fallback){
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function asArray(value, fallback=[]){
+  return Array.isArray(value) ? value : fallback;
+}
+
+function asString(value, fallback=''){
+  return typeof value === 'string' ? value : fallback;
+}
+
+function derivePrestigeGoal(savedDynasty, savedPrestigeGoal){
+  if(Number.isFinite(savedPrestigeGoal) && savedPrestigeGoal > 0) return savedPrestigeGoal;
+  const dynasty = Math.max(0, asFiniteNumber(savedDynasty, 0));
+  return 1000 + (dynasty * 250);
+}
+
+function safeSaveObject(raw){
+  return isPlainObject(raw) ? raw : null;
+}
+
+function sanitizeResourceSnapshot(savedResources){
+  const out = {};
+  if(!isPlainObject(savedResources)) return out;
+  Object.entries(savedResources).forEach(([key, value])=>{
+    if(!isPlainObject(value)) return;
+    out[key] = {
+      amount: asFiniteNumber(value.amount, 0),
+      rate: asFiniteNumber(value.rate, 0),
+      max: asFiniteNumber(value.max, 0),
+    };
+  });
+  return out;
+}
+
+function normalizeSavedResearch(savedResearch){
+  const current = G.research || {};
+  const next = {};
+  Object.keys(current).forEach(id=>{
+    const saved = savedResearch?.[id];
+    next[id] = {
+      completed: typeof saved === 'boolean' ? saved : !!saved?.completed,
+    };
+  });
+  return next;
+}
+
+function sanitizeTroops(savedTroops){
+  if(!isPlainObject(savedTroops)) return;
+  Object.entries(savedTroops).forEach(([type, troop])=>{
+    if(!G.troops[type] || !isPlainObject(troop)) return;
+    G.troops[type].total = Math.max(0, asFiniteNumber(troop.total, G.troops[type].total));
+    G.troops[type].available = Math.max(0, asFiniteNumber(troop.available, G.troops[type].available));
+    G.troops[type].injured = Math.max(0, asFiniteNumber(troop.injured, G.troops[type].injured));
+    G.troops[type].training = Math.max(0, asFiniteNumber(troop.training, G.troops[type].training));
+    G.troops[type].trainEnd = Math.max(0, asFiniteNumber(troop.trainEnd, G.troops[type].trainEnd));
+  });
+}
+
+function sanitizeHospital(savedHospital){
+  if(!isPlainObject(savedHospital)) return;
+  G.hospital.capacity = Math.max(0, asFiniteNumber(savedHospital.capacity, G.hospital.capacity));
+  G.hospital.recovering = Math.max(0, asFiniteNumber(savedHospital.recovering, G.hospital.recovering));
+  G.hospital.recoverEnd = Math.max(0, asFiniteNumber(savedHospital.recoverEnd, G.hospital.recoverEnd));
+}
+
+function sanitizeGarrison(savedGarrison){
+  if(!isPlainObject(savedGarrison)) return;
+  Object.keys(G.garrison).forEach(type=>{
+    G.garrison[type] = Math.max(0, asFiniteNumber(savedGarrison[type], G.garrison[type]));
+  });
+}
+
+function sanitizeStorageLevels(savedStorageLevels){
+  if(!isPlainObject(savedStorageLevels)) return;
+  Object.keys(G.storageLevels).forEach(key=>{
+    G.storageLevels[key] = Math.max(0, asFiniteNumber(savedStorageLevels[key], G.storageLevels[key]));
+  });
+}
+
+function sanitizeManaBuffs(savedManaBuffs){
+  if(!isPlainObject(savedManaBuffs)) return;
+  Object.keys(G.manaBuffs).forEach(key=>{
+    G.manaBuffs[key] = Math.max(0, asFiniteNumber(savedManaBuffs[key], G.manaBuffs[key]));
+  });
+}
+
 async function cloudSave(){
-  if(!G.supabaseUrl||!G.supabaseKey)return;
+  if(!G.supabaseUrl || !G.supabaseKey) return;
   try{
-    const payload=buildSavePayload();
-    const res=await fetch(`${G.supabaseUrl}/rest/v1/saves`,{
+    const payload = buildSavePayload();
+    const res = await fetch(`${G.supabaseUrl}/rest/v1/saves`,{
       method:'POST',
       headers:{
         'apikey':G.supabaseKey,
@@ -15,138 +109,256 @@ async function cloudSave(){
       body:JSON.stringify({id:'player_1',data:JSON.stringify(payload),updated_at:new Date().toISOString()}),
     });
     if(res.ok) addLog('Kingdom chronicle saved to the cloud.','');
-  }catch(e){console.warn('Cloud save failed:',e);}
+  }catch(e){
+    console.warn('Cloud save failed:',e);
+  }
 }
 
 async function cloudLoad(){
-  if(!G.supabaseUrl||!G.supabaseKey)return false;
+  if(!G.supabaseUrl || !G.supabaseKey) return false;
   try{
     await fetchServerTime();
-    const res=await fetch(`${G.supabaseUrl}/rest/v1/saves?id=eq.player_1&select=data,updated_at`,{
+    const res = await fetch(`${G.supabaseUrl}/rest/v1/saves?id=eq.player_1&select=data,updated_at`,{
       headers:{'apikey':G.supabaseKey,'Authorization':`Bearer ${G.supabaseKey}`},
     });
-    if(!res.ok)return false;
-    const rows=await res.json();
-    if(!rows.length)return false;
-    const s=JSON.parse(rows[0].data);
-    const dbUpdatedAt=new Date(rows[0].updated_at).getTime();
-    s.lastSaveTime=dbUpdatedAt;
-    s.lastServerTime=dbUpdatedAt;
-    applyLoadedState(s);
-    G._tickAtLastLoad=G.tick;
+    if(!res.ok) return false;
+    const rows = await res.json();
+    if(!Array.isArray(rows) || !rows.length) return false;
+    const rawData = rows[0]?.data;
+    const parsed = safeSaveObject(typeof rawData === 'string' ? JSON.parse(rawData) : rawData);
+    if(!parsed) return false;
+    const dbUpdatedAt = new Date(rows[0].updated_at).getTime();
+    parsed.lastSaveTime = dbUpdatedAt;
+    parsed.lastServerTime = dbUpdatedAt;
+    applyLoadedState(parsed);
+    G._tickAtLastLoad = G.tick;
     addLog('Dynasty restored from the cloud.','important');
     return true;
-  }catch(e){return false;}
+  }catch(e){
+    return false;
+  }
 }
 
 function buildSavePayload(){
   return {
-    year:G.year,prestige:G.prestige,prestigeRate:G.prestigeRate,
-    prestigePoints:G.prestigePoints,season:G.season,seasonWeek:G.seasonWeek,
-    seasonTick:G.seasonTick,seasonComplete:G.seasonComplete,dynasty:G.dynasty,legacyRelics:G.legacyRelics,
-    governedVillages:G.governedVillages,adminCap:G.adminCap,
-    victoryPath:G.victoryPath,victoryBonus:G.victoryBonus,
+    saveVersion: SAVE_VERSION,
+    year:G.year,
+    era:G.era,
+    prestige:G.prestige,
+    prestigeGoal:G.prestigeGoal,
+    prestigeRate:G.prestigeRate,
+    prestigePoints:G.prestigePoints,
+    season:G.season,
+    seasonWeek:G.seasonWeek,
+    seasonTick:G.seasonTick,
+    seasonComplete:G.seasonComplete,
+    dynasty:G.dynasty,
+    legacyRelics:G.legacyRelics,
+    governedVillages:G.governedVillages,
+    adminCap:G.adminCap,
+    allianceSize:G.allianceSize,
+    victoryPath:G.victoryPath,
+    victoryBonus:G.victoryBonus,
     lastSaveTime:getReliableNow(),
-    lastActiveTime:G.lastActiveTime||getReliableNow(),
-    lastServerTime:G.lastServerTime||getReliableNow(),
-    _lastKnownOfflineCap:G.offlineCapHours*3600,
+    lastActiveTime:G.lastActiveTime || getReliableNow(),
+    lastServerTime:G.lastServerTime || getReliableNow(),
+    offlineCapHours:G.offlineCapHours,
+    _lastKnownOfflineCap:G.offlineCapHours * 3600,
     resources:Object.fromEntries(Object.entries(G.resources).map(([k,v])=>[k,{amount:v.amount,rate:v.rate,max:v.max}])),
-    buildings:G.buildings,research:G.research,heroes:G.heroes,
-    activeResearch:G.activeResearch,researchProgress:G.researchProgress,
-    activeResearch2:G.activeResearch2,researchProgress2:G.researchProgress2,
+    buildings:G.buildings,
+    research:G.research,
+    heroes:G.heroes,
+    activeResearch:G.activeResearch,
+    researchProgress:G.researchProgress,
+    activeResearch2:G.activeResearch2,
+    researchProgress2:G.researchProgress2,
     tick:G.tick,
-    revealedBuildings:G.revealedBuildings,revealedResearch:G.revealedResearch,
+    activeTab:G.activeTab,
+    activeResearchTab:G.activeResearchTab,
+    revealedBuildings:G.revealedBuildings,
+    revealedResearch:G.revealedResearch,
     showLockedBuildings:G.showLockedBuildings,
     showMaxedBuildings:G.showMaxedBuildings,
     unlockedResearchTabs:G.unlockedResearchTabs,
-    flags:{costReduction:G.costReduction,wardProtect:G.wardProtect,hasAlchemy:G.hasAlchemy,
-           hasFarsight:G.hasFarsight,hasSiege:G.hasSiege,questTimeMulti:G.questTimeMulti,fortBonus:G.fortBonus},
-    troops:G.troops,hospital:G.hospital,npcFarms:G.npcFarms,
-    activeRaids:G.activeRaids,combatLog:G.combatLog,autoFarm:G.autoFarm,
+    flags:{
+      costReduction:G.costReduction,
+      wardProtect:G.wardProtect,
+      hasAlchemy:G.hasAlchemy,
+      hasFarsight:G.hasFarsight,
+      hasSiege:G.hasSiege,
+      questTimeMulti:G.questTimeMulti,
+      fortBonus:G.fortBonus,
+    },
+    troops:G.troops,
+    hospital:G.hospital,
+    npcFarms:G.npcFarms,
+    activeRaids:G.activeRaids,
+    combatLog:G.combatLog,
+    autoFarm:G.autoFarm,
     raidReports:G.raidReports,
-    wallDefence:G.wallDefence,garrison:G.garrison,watchtowerUnlocked:G.watchtowerUnlocked,
-    warChest:G.warChest,warChestCap:G.warChestCap,warChestWeeklyConverted:G.warChestWeeklyConverted,
-    lastWarChestDecay:G.lastWarChestDecay,storageLevels:G.storageLevels,manaBuffs:G.manaBuffs,
-    supabaseUrl:G.supabaseUrl,supabaseKey:G.supabaseKey,
+    wallDefence:G.wallDefence,
+    garrison:G.garrison,
+    watchtowerUnlocked:G.watchtowerUnlocked,
+    warChest:G.warChest,
+    warChestCap:G.warChestCap,
+    warChestWeeklyConverted:G.warChestWeeklyConverted,
+    lastWarChestDecay:G.lastWarChestDecay,
+    storageLevels:G.storageLevels,
+    manaBuffs:G.manaBuffs,
+    kingdomName:G.kingdomName,
+    playerName:G.playerName,
+    tutorialStep:G.tutorialStep,
+    tutorialDone:G.tutorialDone,
+    milestonesReached:G.milestonesReached,
+    supabaseUrl:G.supabaseUrl,
+    supabaseKey:G.supabaseKey,
     log:G.log.slice(0,20),
   };
 }
 
-function applyLoadedState(s){
-  G.year=s.year||1;G.prestige=s.prestige||0;G.prestigeRate=s.prestigeRate||0;
-  G.prestigePoints=s.prestigePoints||0;
-  G.season=s.season||1;G.seasonWeek=s.seasonWeek||1;G.seasonTick=s.seasonTick||0;
-  G.seasonComplete=!!s.seasonComplete;
-  G.dynasty=s.dynasty||0;G.legacyRelics=capRelicStacks(s.legacyRelics||[]);
-  G.governedVillages=s.governedVillages||{};
-  G.adminCap=s.adminCap||1;
-  G.victoryPath=s.victoryPath||'mixed';G.victoryBonus=s.victoryBonus||0;
-  G.lastSaveTime=s.lastSaveTime||Date.now();
-  G.lastActiveTime=s.lastActiveTime||s.lastSaveTime||Date.now();
-  G.lastServerTime=s.lastServerTime||s.lastSaveTime||Date.now();
-  G._lastKnownOfflineCap=s._lastKnownOfflineCap||G.offlineCapHours*3600;
-  Object.entries(s.resources||{}).forEach(([k,v])=>{
-    if(G.resources[k]){G.resources[k].amount=v.amount;if(v.rate>G.resources[k].rate)G.resources[k].rate=v.rate;G.resources[k].max=v.max;}
+function applyLoadedState(rawSave){
+  const s = safeSaveObject(rawSave);
+  if(!s) return;
+
+  const savedDynasty = Math.max(0, asFiniteNumber(s.dynasty, 0));
+
+  G.year = Math.max(1, asFiniteNumber(s.year, 1));
+  G.era = asString(s.era, G.era || 'First Age');
+  G.prestige = Math.max(0, asFiniteNumber(s.prestige, 0));
+  G.prestigeGoal = derivePrestigeGoal(savedDynasty, s.prestigeGoal);
+  G.prestigeRate = Math.max(0, asFiniteNumber(s.prestigeRate, 0));
+  G.prestigePoints = Math.max(0, asFiniteNumber(s.prestigePoints, 0));
+  G.season = Math.max(1, asFiniteNumber(s.season, 1));
+  G.seasonWeek = Math.max(1, asFiniteNumber(s.seasonWeek, 1));
+  G.seasonTick = Math.max(0, asFiniteNumber(s.seasonTick, 0));
+  G.seasonComplete = !!s.seasonComplete;
+  G.dynasty = savedDynasty;
+  G.legacyRelics = capRelicStacks(asArray(s.legacyRelics, []));
+  G.governedVillages = isPlainObject(s.governedVillages) ? s.governedVillages : {};
+  G.adminCap = Math.max(1, asFiniteNumber(s.adminCap, 1));
+  G.allianceSize = Math.max(1, asFiniteNumber(s.allianceSize, G.allianceSize || 8));
+  G.victoryPath = asString(s.victoryPath, 'mixed');
+  G.victoryBonus = Math.max(0, asFiniteNumber(s.victoryBonus, 0));
+  G.lastSaveTime = Math.max(0, asFiniteNumber(s.lastSaveTime, Date.now()));
+  G.lastActiveTime = Math.max(0, asFiniteNumber(s.lastActiveTime, G.lastSaveTime));
+  G.lastServerTime = Math.max(0, asFiniteNumber(s.lastServerTime, G.lastSaveTime));
+  G.offlineCapHours = Math.max(1, asFiniteNumber(s.offlineCapHours, G.offlineCapHours || 12));
+  G._lastKnownOfflineCap = Math.max(0, asFiniteNumber(s._lastKnownOfflineCap, G.offlineCapHours * 3600));
+
+  const savedResources = sanitizeResourceSnapshot(s.resources);
+  Object.entries(savedResources).forEach(([key, value])=>{
+    if(!G.resources[key]) return;
+    G.resources[key].amount = Math.max(0, asFiniteNumber(value.amount, G.resources[key].amount));
+    G.resources[key].rate = asFiniteNumber(value.rate, G.resources[key].rate);
+    G.resources[key].max = Math.max(0, asFiniteNumber(value.max, G.resources[key].max));
   });
-  (s.buildings||[]).forEach(b=>{const g=G.buildings.find(x=>x.id===b.id);if(g)g.level=b.level;});
-  Object.assign(G.research,s.research||{});
-  G.heroes=s.heroes||[];
+
+  asArray(s.buildings, []).forEach(b=>{
+    if(!isPlainObject(b)) return;
+    const current = G.buildings.find(x=>x.id===b.id);
+    if(current) current.level = Math.max(0, asFiniteNumber(b.level, current.level));
+  });
+
+  G.research = normalizeSavedResearch(s.research);
+  G.heroes = asArray(s.heroes, []).filter(isPlainObject);
   normalizeHeroes();
-  G.activeResearch=s.activeResearch||null;G.researchProgress=s.researchProgress||0;G.tick=s.tick||0;
-  if(s.revealedBuildings)G.revealedBuildings=s.revealedBuildings;
-  if(s.revealedResearch)G.revealedResearch=s.revealedResearch;
-  G.showLockedBuildings=!!s.showLockedBuildings;
-  G.showMaxedBuildings=!!s.showMaxedBuildings;
-  if(s.unlockedResearchTabs)G.unlockedResearchTabs=s.unlockedResearchTabs;
-  if(s.flags){const f=s.flags;G.costReduction=f.costReduction;G.wardProtect=f.wardProtect;G.hasAlchemy=f.hasAlchemy;G.hasFarsight=f.hasFarsight;G.hasSiege=f.hasSiege;G.questTimeMulti=f.questTimeMulti;G.fortBonus=f.fortBonus;}
-  if(s.troops)Object.assign(G.troops,s.troops);
-  if(s.hospital)Object.assign(G.hospital,s.hospital);
+
+  G.activeResearch = typeof s.activeResearch === 'string' ? s.activeResearch : null;
+  G.researchProgress = Math.max(0, asFiniteNumber(s.researchProgress, 0));
+  G.activeResearch2 = typeof s.activeResearch2 === 'string' ? s.activeResearch2 : null;
+  G.researchProgress2 = Math.max(0, asFiniteNumber(s.researchProgress2, 0));
+  G.tick = Math.max(0, asFiniteNumber(s.tick, 0));
+  G.activeTab = asString(s.activeTab, G.activeTab || 'kingdom');
+  G.activeResearchTab = asString(s.activeResearchTab, G.activeResearchTab || 'economy');
+  G.revealedBuildings = asArray(s.revealedBuildings, G.revealedBuildings).filter(v=>typeof v === 'string');
+  G.revealedResearch = asArray(s.revealedResearch, G.revealedResearch).filter(v=>typeof v === 'string');
+  G.showLockedBuildings = !!s.showLockedBuildings;
+  G.showMaxedBuildings = !!s.showMaxedBuildings;
+  G.unlockedResearchTabs = asArray(s.unlockedResearchTabs, G.unlockedResearchTabs).filter(v=>typeof v === 'string');
+
+  const flags = isPlainObject(s.flags) ? s.flags : {};
+  G.costReduction = flags.costReduction ?? G.costReduction;
+  G.wardProtect = !!flags.wardProtect;
+  G.hasAlchemy = !!flags.hasAlchemy;
+  G.hasFarsight = !!flags.hasFarsight;
+  G.hasSiege = !!flags.hasSiege;
+  G.questTimeMulti = flags.questTimeMulti ?? G.questTimeMulti;
+  G.fortBonus = asFiniteNumber(flags.fortBonus, G.fortBonus);
+
+  sanitizeTroops(s.troops);
+  sanitizeHospital(s.hospital);
   mergeSavedNpcFarms(s.npcFarms);
-  if(s.activeRaids)G.activeRaids=s.activeRaids;
-  if(s.combatLog)G.combatLog=s.combatLog;
-  if(s.raidReports)G.raidReports=s.raidReports;
-  if(s.autoFarm)G.autoFarm=s.autoFarm;
-  if(s.activeResearch2!=null){G.activeResearch2=s.activeResearch2;G.researchProgress2=s.researchProgress2||0;}
-  if(s.wallDefence!=null)G.wallDefence=s.wallDefence;
-  if(s.garrison)Object.assign(G.garrison,s.garrison);
-  if(s.watchtowerUnlocked)G.watchtowerUnlocked=s.watchtowerUnlocked;
-  if(s.warChest!=null)G.warChest=s.warChest;
-  if(s.warChestCap)G.warChestCap=s.warChestCap;
-  if(s.warChestWeeklyConverted!=null)G.warChestWeeklyConverted=s.warChestWeeklyConverted;
-  if(s.lastWarChestDecay)G.lastWarChestDecay=s.lastWarChestDecay;
-  if(s.storageLevels)Object.assign(G.storageLevels,s.storageLevels);
-  if(s.manaBuffs)Object.assign(G.manaBuffs,s.manaBuffs);
-  if(s.supabaseUrl)G.supabaseUrl=s.supabaseUrl;
-  if(s.supabaseKey)G.supabaseKey=s.supabaseKey;
-  G.log=s.log||G.log;
+
+  G.activeRaids = asArray(s.activeRaids, []).filter(isPlainObject);
+  G.combatLog = asArray(s.combatLog, []).filter(isPlainObject);
+  G.raidReports = asArray(s.raidReports, []).filter(isPlainObject);
+  G.autoFarm = isPlainObject(s.autoFarm) ? s.autoFarm : {};
+  G.wallDefence = Math.max(0, asFiniteNumber(s.wallDefence, G.wallDefence));
+  sanitizeGarrison(s.garrison);
+  G.watchtowerUnlocked = !!s.watchtowerUnlocked;
+  G.warChest = Math.max(0, asFiniteNumber(s.warChest, 0));
+  G.warChestCap = Math.max(0, asFiniteNumber(s.warChestCap, G.warChestCap));
+  G.warChestWeeklyConverted = Math.max(0, asFiniteNumber(s.warChestWeeklyConverted, 0));
+  G.lastWarChestDecay = Math.max(0, asFiniteNumber(s.lastWarChestDecay, 0));
+  sanitizeStorageLevels(s.storageLevels);
+  sanitizeManaBuffs(s.manaBuffs);
+
+  G.kingdomName = asString(s.kingdomName, G.kingdomName || 'Arnethia');
+  G.playerName = asString(s.playerName, G.playerName || '');
+  G.tutorialStep = Math.max(0, asFiniteNumber(s.tutorialStep, 0));
+  G.tutorialDone = !!s.tutorialDone;
+  G.milestonesReached = asArray(s.milestonesReached, []).filter(v=>typeof v === 'string');
+  G.supabaseUrl = asString(s.supabaseUrl, G.supabaseUrl || '');
+  G.supabaseKey = asString(s.supabaseKey, G.supabaseKey || '');
+  G.log = asArray(s.log, G.log).filter(isPlainObject);
+
   normalizeDerivedBuildingState();
 }
 
 function mergeSavedNpcFarms(savedFarms){
-  if(!Array.isArray(savedFarms)||!savedFarms.length){
-    G.npcFarms=NPC_FARMS.map(f=>({...f}));
+  if(!Array.isArray(savedFarms) || !savedFarms.length){
+    G.npcFarms = NPC_FARMS.map(f=>({...f}));
     return;
   }
-  const savedById=Object.fromEntries(savedFarms.map(f=>[f.id,f]));
-  G.npcFarms=NPC_FARMS.map(base=>({
+  const savedById = Object.fromEntries(
+    savedFarms
+      .filter(isPlainObject)
+      .filter(f=>typeof f.id === 'string')
+      .map(f=>[f.id, f])
+  );
+  G.npcFarms = NPC_FARMS.map(base=>({
     ...base,
-    ...(savedById[base.id]||{}),
-    loot:{...(base.loot||{}),...((savedById[base.id]||{}).loot||{})},
-    tribute:{...(base.tribute||{}),...((savedById[base.id]||{}).tribute||{})},
+    ...(savedById[base.id] || {}),
+    loot:{...(base.loot || {}), ...((savedById[base.id] || {}).loot || {})},
+    tribute:{...(base.tribute || {}), ...((savedById[base.id] || {}).tribute || {})},
   }));
 }
 
 function saveGame(){
-  G.lastSaveTime=getReliableNow();
-  G.lastServerTime=G.lastSaveTime;
-  try{localStorage.setItem('hc4',JSON.stringify(buildSavePayload()));}catch(e){}
+  G.lastSaveTime = getReliableNow();
+  G.lastServerTime = G.lastSaveTime;
+  try{
+    localStorage.setItem('hc4', JSON.stringify(buildSavePayload()));
+  }catch(e){}
 }
 
 function loadGame(){
   try{
-    const raw=localStorage.getItem('hc4')||localStorage.getItem('hc3');
-    if(!raw)return;
-    applyLoadedState(JSON.parse(raw));
+    const raw = localStorage.getItem('hc4') || localStorage.getItem('hc3');
+    if(!raw) return;
+    const parsed = safeSaveObject(JSON.parse(raw));
+    if(!parsed) return;
+    applyLoadedState(parsed);
     addLog('Chronicle restored. Your dynasty continues...','important');
   }catch(e){}
+}
+
+function clearLocalSave(){
+  const ok = window.confirm('Clear your local save and restart from a fresh kingdom? This cannot be undone.');
+  if(!ok) return;
+  try{
+    localStorage.removeItem('hc4');
+    localStorage.removeItem('hc3');
+  }catch(e){}
+  window.location.reload();
 }

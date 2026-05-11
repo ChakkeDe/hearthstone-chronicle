@@ -47,3 +47,13 @@
 - Explain architectural decisions
 - Do not make unrelated changes
 - Do not change formatting unnecessarily
+
+## Verification
+
+- Run `node --check src/game.js`
+- Run `node --check src/save.js`
+- Run `node --check src/pwa.js`
+- Run `node --check sw.js`
+- Do a manual save/load check after gameplay or save changes
+- Do a manual offline progress check after timer or save changes
+- Do a manual PWA update check after release or cache changes

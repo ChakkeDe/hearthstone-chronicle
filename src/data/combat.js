@@ -7,7 +7,7 @@ const TROOP_DEF={
 };
 
 const NPC_FARMS=[
-  {id:'n1',name:'Peasant Village',icon:'🏘',level:1,def:20, loot:{gold:30,food:40,wood:20}, tribute:{food:2.6,wood:1.8}, controlNeed:100, respawn:300,available:true,respawnAt:0},
+  {id:'n1',name:'Peasant Village',icon:'🏘',level:1,def:40, loot:{gold:30,food:40,wood:20}, tribute:{food:2.6,wood:1.8}, controlNeed:100, respawn:300,available:true,respawnAt:0},
   {id:'n2',name:'Abandoned Fort',  icon:'🏚',level:2,def:50, loot:{gold:60,iron:20,wood:30}, tribute:{gold:2.4,iron:1}, controlNeed:100, respawn:480,available:true,respawnAt:0},
   {id:'n3',name:'River Crossing',  icon:'🌊',level:2,def:40, loot:{food:80,wood:50}, tribute:{food:3.4,wood:2.4}, controlNeed:100, respawn:420,available:true,respawnAt:0},
   {id:'n4',name:'Bandit Camp',     icon:'⛺',level:3,def:100,loot:{gold:100,iron:40}, tribute:{gold:4.2,iron:1.8}, controlNeed:120, respawn:600,available:true,respawnAt:0},

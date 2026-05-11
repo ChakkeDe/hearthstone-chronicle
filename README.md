@@ -34,6 +34,7 @@ The design goal is a strategic idle game that feels readable on mobile, rewards 
 - [Development Rules](AGENTS.md)
 - [Game Design Document](docs/GDD.md)
 - [QA Checklist](docs/QA.md)
+- [Release Process](docs/RELEASE.md)
 
 ## Local Setup
 
@@ -87,7 +88,7 @@ The app is designed for static hosting and works well on GitHub Pages.
 - `index.html` is the app entry point
 - `manifest.json` controls install metadata
 - `sw.js` and `version.json` drive update behavior
-- Player-visible updates should bump the version metadata and any cache keys used by the service worker flow
+- Player-visible updates should bump the version metadata and the service worker cache key together
 
 After deployment, give GitHub Pages a minute or two to publish before testing on mobile or in a PWA install.
 
@@ -100,6 +101,7 @@ hearthstone-chronicle/
   docs/
     GDD.md
     QA.md
+    RELEASE.md
   assets/
   styles/
     main.css
@@ -141,17 +143,15 @@ The intended workflow is small, reviewable, low-risk iteration.
 6. Test the app in a browser, especially on mobile-sized layouts
 7. If the update affects caching or deployment behavior, verify the PWA refresh flow
 
-### Release checklist
+### Release workflow
 
-Before merging a release-ready patch:
+Use the dedicated [Release Process](docs/RELEASE.md) document for:
 
-1. Confirm the change respects [AGENTS.md](AGENTS.md)
-2. Re-read relevant sections of [docs/GDD.md](docs/GDD.md)
-3. Verify no dependencies or tooling layers were added unnecessarily
-4. Run syntax checks on changed scripts
-5. Test save/load, offline progress, and mobile readability
-6. Update version metadata when the release changes player-visible behavior
-7. Deploy to GitHub Pages and validate the live build
+- before-release checks
+- version bump steps
+- PWA cache bump steps
+- GitHub Pages deployment steps
+- post-release smoke testing
 
 ## Contributing Notes
 
