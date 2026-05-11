@@ -103,8 +103,8 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '1.2.1';
-const CACHE_VERSION = 'hc-v43';
+const APP_VERSION = '1.2.2';
+const CACHE_VERSION = 'hc-v44';
 const RELIC_STACK_CAP = 5;
 
 const BASE_RESOURCE_MAX={gold:900,food:900,wood:900,stone:900,iron:600,mana:400};
@@ -498,7 +498,6 @@ function endSeason(){
 }
 
 function showSeasonEndScreen(finalPrestige, path){
-  const frontierRenown=strongholdSeasonRenown();
   const existing=document.getElementById('season-overlay');
   if(existing)existing.remove();
   const overlay=document.createElement('div');
@@ -509,36 +508,43 @@ function showSeasonEndScreen(finalPrestige, path){
     {id:'relic_combat',name:'Sword of Ages',icon:'⚔',desc:'+15% hero power in future dynasties'},
     {id:'relic_research',name:'Ancient Tome',icon:'📚',desc:'-10% research time in future dynasties'},
   ];
+  const allRelicsCapped=relicOptions.every(r=>countRelic(r.id)>=RELIC_STACK_CAP);
+  const pathText=path?(path.icon+' '+path.label+' · +'+path.bonus+'% bonus applied'):'Mixed path';
+  const introText=allRelicsCapped?'Your relic vault is full. Advance the dynasty without claiming an extra relic.':'Your realm endures. Choose the legacy that will strengthen it next.';
+  const continueText=allRelicsCapped?'All legacy relics are already at the cap. No additional relic will be granted this season.':'Select a relic to continue';
+  const buttonText=allRelicsCapped?'Advance Dynasty - Relics Maxed':'Advance Dynasty';
+  const relicCards=relicOptions.map(r=>{
+    const stacks=countRelic(r.id);
+    const capped=stacks>=RELIC_STACK_CAP;
+    return `
+      <div onclick="selectRelic('${r.id}')" data-relic="${r.id}" data-capped="${capped?1:0}" style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.2);border-radius:4px;padding:10px 14px;cursor:${capped?'not-allowed':'pointer'};display:flex;align-items:center;gap:10px;transition:all .2s;opacity:${capped?0.45:1}">
+        <span style="font-size:22px">${r.icon}</span>
+        <div><div style="font-family:'Cinzel',serif;font-size:12px;color:var(--parchment)">${r.name}</div>
+        <div style="font-size:11px;color:var(--stone-light);font-style:italic">${r.desc} · ${stacks}/${RELIC_STACK_CAP}${capped?' max':''}</div></div>
+      </div>`;
+  }).join('');
   overlay.innerHTML=`
     <div style="font-family:'Cinzel',serif;text-align:center;max-width:400px;width:100%">
       <div style="font-size:11px;letter-spacing:3px;color:var(--gold-dark);text-transform:uppercase;margin-bottom:8px">Season ${G.season} Complete</div>
       <div style="font-size:26px;color:var(--gold);font-weight:700;margin-bottom:4px">Dynasty ${G.dynasty+1} Ascends</div>
-      <div style="font-size:14px;color:var(--parchment-dark);font-style:italic;margin-bottom:20px">Your realm endures. Choose the legacy that will strengthen it next.</div>
+      <div style="font-size:14px;color:var(--parchment-dark);font-style:italic;margin-bottom:20px">${introText}</div>
       <div style="background:rgba(201,168,76,.08);border:1px solid var(--panel-border);border-radius:6px;padding:14px;margin-bottom:20px">
         <div style="font-size:13px;color:var(--gold-dark);margin-bottom:6px;letter-spacing:1px;text-transform:uppercase">Season Renown</div>
         <div style="font-size:32px;color:var(--gold);font-weight:700;font-family:'Cinzel',serif">${finalPrestige.toLocaleString()}</div>
-        <div style="font-size:12px;color:var(--forest-light);margin-top:4px">${path?`${path.icon} ${path.label} · +${path.bonus}% bonus applied`:'Mixed path'}</div>
+        <div style="font-size:12px;color:var(--forest-light);margin-top:4px">${pathText}</div>
       </div>
       <div style="font-size:12px;color:var(--gold-dark);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Choose Your Legacy Relic</div>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
-        ${relicOptions.map(r=>{
-          const stacks=countRelic(r.id), capped=stacks>=RELIC_STACK_CAP;
-          return`
-          <div onclick="selectRelic('${r.id}')" data-relic="${r.id}" data-capped="${capped?1:0}" style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.2);border-radius:4px;padding:10px 14px;cursor:${capped?'not-allowed':'pointer'};display:flex;align-items:center;gap:10px;transition:all .2s;opacity:${capped?0.45:1}">
-            <span style="font-size:22px">${r.icon}</span>
-            <div><div style="font-family:'Cinzel',serif;font-size:12px;color:var(--parchment)">${r.name}</div>
-            <div style="font-size:11px;color:var(--stone-light);font-style:italic">${r.desc} · ${stacks}/${RELIC_STACK_CAP}${capped?' max':''}</div></div>
-          </div>`}).join('')}
-      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">${relicCards}</div>
       <div style="font-size:11px;color:var(--forest-light);font-style:italic;margin-bottom:16px">Every second dynasty also grants +1 realm administration slot.</div>
-      <button onclick="beginNewDynasty()" id="new-dynasty-btn" disabled style="width:100%;padding:12px;background:rgba(201,168,76,.1);border:1px solid var(--gold-dark);border-radius:4px;color:var(--gold);font-family:'Cinzel',serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;cursor:not-allowed;opacity:.4">
-        Advance Dynasty
+      <button onclick="beginNewDynasty()" id="new-dynasty-btn" ${allRelicsCapped?'':'disabled'} style="width:100%;padding:12px;background:rgba(201,168,76,.1);border:1px solid var(--gold-dark);border-radius:4px;color:var(--gold);font-family:'Cinzel',serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;cursor:${allRelicsCapped?'pointer':'not-allowed'};opacity:${allRelicsCapped?'1':'.4'}">
+        ${buttonText}
       </button>
-      <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-top:8px">Select a relic to continue</div>
+      <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-top:8px">${continueText}</div>
     </div>`;
   document.body.appendChild(overlay);
   G._pendingRelic=null;
 }
+
 
 let _selectedRelic=null;
 function selectRelic(id){
@@ -553,9 +559,23 @@ function selectRelic(id){
 }
 
 function beginNewDynasty(){
-  if(!_selectedRelic)return;
-  if(countRelic(_selectedRelic)>=RELIC_STACK_CAP){showSnot('Relic stack cap reached');return;}
-  G.legacyRelics.push(_selectedRelic);
+  const relicIds=['relic_gold','relic_combat','relic_research'];
+  const allRelicsCapped=relicIds.every(id=>countRelic(id)>=RELIC_STACK_CAP);
+  if(!_selectedRelic && !allRelicsCapped){
+    showSnot('Select a relic to continue');
+    return;
+  }
+  if(_selectedRelic){
+    if(countRelic(_selectedRelic)>=RELIC_STACK_CAP){
+      if(!allRelicsCapped){
+        showSnot('Relic stack cap reached');
+        return;
+      }
+      _selectedRelic=null;
+    }else{
+      G.legacyRelics.push(_selectedRelic);
+    }
+  }
   G.dynasty++;
   G.season++;
   G.seasonWeek=1;
@@ -594,6 +614,7 @@ function beginNewDynasty(){
   renderAll();
   saveGame();
 }
+
 
 
 // Cost helper — cheap early levels, steeper later. Base * 1.65^(level-1)
