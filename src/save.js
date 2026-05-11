@@ -14,7 +14,7 @@ async function cloudSave(){
       },
       body:JSON.stringify({id:'player_1',data:JSON.stringify(payload),updated_at:new Date().toISOString()}),
     });
-    if(res.ok) addLog('Kingdom chronicle saved to the cloud. â˜','');
+    if(res.ok) addLog('Kingdom chronicle saved to the cloud.','');
   }catch(e){console.warn('Cloud save failed:',e);}
 }
 
@@ -34,7 +34,7 @@ async function cloudLoad(){
     s.lastServerTime=dbUpdatedAt;
     applyLoadedState(s);
     G._tickAtLastLoad=G.tick;
-    addLog('Dynasty restored from the cloud. â˜','important');
+    addLog('Dynasty restored from the cloud.','important');
     return true;
   }catch(e){return false;}
 }
@@ -147,6 +147,6 @@ function loadGame(){
     const raw=localStorage.getItem('hc4')||localStorage.getItem('hc3');
     if(!raw)return;
     applyLoadedState(JSON.parse(raw));
-    addLog('Chronicle restored. Your dynasty continuesâ€¦','important');
+    addLog('Chronicle restored. Your dynasty continues...','important');
   }catch(e){}
 }

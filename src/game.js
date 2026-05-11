@@ -33,7 +33,7 @@ const G={
   unlockedResearchTabs:['economy','military'],
   costReduction:null,wardProtect:false,hasAlchemy:false,
   hasFarsight:false,hasSiege:false,questTimeMulti:null,fortBonus:0,
-  // â”€â”€ COMBAT STATE â”€â”€
+  // ==== COMBAT STATE ====
   troops:{
     infantry:{total:0,available:0,injured:0,training:0,trainEnd:0},
     archers: {total:0,available:0,injured:0,training:0,trainEnd:0},
@@ -44,40 +44,40 @@ const G={
   npcFarms:[],activeRaids:[],combatLog:[],
   raidReports:[],
   autoFarm:{},                    // {farmId: {enabled, troopFloor, lastCheck}}
-  // â”€â”€ DEFENCE â”€â”€
+  // ==== DEFENCE ====
   wallDefence:0,
   garrison:{infantry:0,archers:0,cavalry:0},
   watchtowerUnlocked:false,
-  // â”€â”€ WAR CHEST â”€â”€
+  // ==== WAR CHEST ====
   warChest:0,
   warChestCap:500,
   warChestDecayRate:0.02,         // 2% per day
   warChestWeeklyConverted:0,
   warChestWeeklyLimit:1000,
   lastWarChestDecay:0,
-  // â”€â”€ DUAL RESEARCH â”€â”€
+  // ==== DUAL RESEARCH ====
   activeResearch2:null,
   researchProgress2:0,
-  // â”€â”€ STORAGE â”€â”€
+  // ==== STORAGE ====
   storageLevels:{granary:0,vault:0,timberyard:0,armoury:0,manawell:0},
   manaBuffs:{harvestEnd:0,battleEnd:0,wardEnd:0},
-  // â”€â”€ UI FLAGS â”€â”€
+  // ==== UI FLAGS ====
   cityDirty:true,
   logDirty:true,
-  // â”€â”€ KINGDOM IDENTITY â”€â”€
+  // ==== KINGDOM IDENTITY ====
   kingdomName:'Arnethia',
   playerName:'',
-  // â”€â”€ TUTORIAL â”€â”€
+  // ==== TUTORIAL ====
   tutorialStep:0,
   tutorialDone:false,
-  // â”€â”€ MILESTONES â”€â”€
+  // ==== MILESTONES ====
   milestonesReached:[],
   // Supabase config
   supabaseUrl:'',supabaseKey:'',
 };
 
 function earlyBoost(){
-  // Tapers from 5x at 0 buildings to 1x at 25 total levels — much slower fade
+  // Tapers from 5x at 0 buildings to 1x at 25 total levels - much slower fade
   const t=G.buildings.reduce((s,b)=>s+b.level,0);
   return Math.max(1, 3.2-(t*0.12));
 }
@@ -144,7 +144,7 @@ const GOVERNOR_TRAITS={
 
 const HERO_LEVEL_CAP = 20;
 
-// â”€â”€ UPDATE CHECKER â”€â”€
+// ==== UPDATE CHECKER ====
 let _updateReloading=false;
 
 function checkForUpdate(){
@@ -197,12 +197,12 @@ function showUpdateBanner(msg='New version available'){
     font-family:'Cinzel',serif;font-size:12px;color:var(--gold-light);
     box-shadow:0 4px 20px rgba(0,0,0,.6);white-space:nowrap;`;
   el.innerHTML=`
-    <span>✦ ${msg}</span>
+    <span>* ${msg}</span>
     <button onclick="applyUpdate()" style="background:rgba(201,168,76,.2);border:1px solid var(--gold);
       border-radius:3px;padding:4px 10px;color:var(--gold);font-family:'Cinzel',serif;
       font-size:10px;letter-spacing:1px;cursor:pointer;touch-action:manipulation;">Update</button>
     <button onclick="this.parentElement.remove()" style="background:none;border:none;
-      color:var(--stone-light);font-size:16px;cursor:pointer;padding:0 4px;touch-action:manipulation;">✕</button>`;
+      color:var(--stone-light);font-size:16px;cursor:pointer;padding:0 4px;touch-action:manipulation;">x</button>`;
   document.body.appendChild(el);
 }
 
@@ -211,7 +211,7 @@ async function manualCheckForUpdate(){
     showSnot('Updates are not supported in this browser');
     return;
   }
-  showSnot(`Checking for updates — v${APP_VERSION}`);
+  showSnot(`Checking for updates - v${APP_VERSION}`);
   try{
     const reg=await navigator.serviceWorker.ready;
     await reg.update();
