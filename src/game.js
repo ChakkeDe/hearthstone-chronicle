@@ -14,12 +14,13 @@ const G={
   lastSaveTime: Date.now(),  // save timestamp
   lastActiveTime: Date.now(), // last real game tick timestamp for AFK calculation
   offlineCapHours:12,
+  // Base resource rates are normalized from BASE_RESOURCE_RATE during init/load.
   resources:{
-    gold: {amount:110, rate:2,  max:500, icon:'🪙',name:'Gold'},
-    food: {amount:140, rate:3,  max:500, icon:'🌾',name:'Food'},
-    wood: {amount:120, rate:3,  max:500, icon:'🪵',name:'Wood'},
-    stone:{amount:80, rate:2,  max:500, icon:'⚙', name:'Stone'},
-    iron: {amount:0, rate:1,  max:300,icon:'⛏', name:'Iron'},
+    gold: {amount:110, rate:1,  max:500, icon:'🪙',name:'Gold'},
+    food: {amount:140, rate:1.5,max:500, icon:'🌾',name:'Food'},
+    wood: {amount:120, rate:1.5,max:500, icon:'🪵',name:'Wood'},
+    stone:{amount:80, rate:1,  max:500, icon:'⚙', name:'Stone'},
+    iron: {amount:0, rate:0.35,max:300,icon:'⛏', name:'Iron'},
     mana: {amount:0, rate:0,max:200,icon:'✨',name:'Mana'},
   },
   buildings:[],research:{},heroes:[],
