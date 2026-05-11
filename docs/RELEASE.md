@@ -7,23 +7,27 @@ This document defines the permanent release flow for Hearthstone Chronicles.
 1. Confirm the change still follows [AGENTS.md](../AGENTS.md).
 2. Re-read any relevant design constraints in [GDD.md](GDD.md).
 3. Verify no unnecessary dependencies or tooling were introduced.
-4. Run the required syntax checks:
+4. Run the lightweight release consistency checker:
+   - `node scripts/check-release-consistency.js`
+5. Run the required syntax checks:
    - `node --check src/game.js`
    - `node --check src/save.js`
    - `node --check src/pwa.js`
    - `node --check sw.js`
-5. Run a manual save/load check after gameplay or save changes.
-6. Run a manual offline progress check after timer or save changes.
-7. If the release touches the app shell, cached files, or deployment flow, run a manual PWA update check before and after deployment.
+6. Run a manual save/load check after gameplay or save changes.
+7. Run a manual offline progress check after timer or save changes.
+8. If the release touches the app shell, cached files, or deployment flow, run a manual PWA update check before and after deployment.
 
 ## Version Bump Checklist
 
 When the release should present a new visible build to players:
 
-1. Bump the app version in [../version.json](../version.json).
-2. Bump the cache version in [../version.json](../version.json).
-3. Update the visible version label if needed.
-4. Confirm the app version shown in the UI still matches the intended release.
+1. Prefer the helper script to update all release references together:
+   - `node scripts/bump-release.js <app-version> <cache-version>`
+2. If updating manually, bump the app version in [../version.json](../version.json).
+3. If updating manually, bump the cache version in [../version.json](../version.json).
+4. If updating manually, update the visible version label if needed.
+5. Confirm the app version shown in the UI still matches the intended release.
 
 ## PWA Cache Bump Checklist
 
@@ -34,6 +38,7 @@ When changing cached shell files or static assets:
 3. Ensure all required static assets are listed in the `ASSETS` array in [../sw.js](../sw.js).
 4. Verify any new script loaded by [../index.html](../index.html) is also cached in [../sw.js](../sw.js).
 5. Keep the caching strategy unchanged unless the release explicitly intends to alter update behavior.
+6. Re-run `node scripts/check-release-consistency.js` after the bump.
 
 ## GitHub Pages Deployment Checklist
 

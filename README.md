@@ -153,6 +153,13 @@ Use the dedicated [Release Process](docs/RELEASE.md) document for:
 - GitHub Pages deployment steps
 - post-release smoke testing
 
+Helpful release scripts:
+
+```bash
+node scripts/check-release-consistency.js
+node scripts/bump-release.js 1.2.5 hc-v47
+```
+
 ## Contributing Notes
 
 - Preserve vanilla script loading
