@@ -1930,13 +1930,13 @@ function blvl(id){return G.buildings.find(b=>b.id===id)?.level||0;}
 function chkReq(bDef){if(!bDef.req)return true;return Object.entries(bDef.req).every(([id,l])=>blvl(id)>=l);}
 
 // Temporary debug helper for investigating Stone Quarry income mismatches.
-function debugStoneIncome(){
+function getStoneDebugSnapshot(){
   const mineLevel=blvl('mine');
   const mineState=G.buildings.find(b=>b.id==='mine')||null;
   const quarryDef=BD.find(b=>b.id==='mine')||null;
   const stonemasonsCompleted=!!G.research?.stonemasons?.completed;
   const totalBuildingLevels=G.buildings.reduce((sum,b)=>sum+(b.level||0),0);
-  const snapshot={
+  return {
     appVersion:APP_VERSION,
     cacheVersion:CACHE_VERSION,
     stoneAmount:G.resources?.stone?.amount ?? null,
@@ -1950,12 +1950,100 @@ function debugStoneIncome(){
     stonemasonsCompleted,
     totalBuildingLevels
   };
+}
+
+function debugStoneIncome(){
+  const snapshot=getStoneDebugSnapshot();
   console.group('debugStoneIncome');
   console.log('Stone income snapshot',snapshot);
   console.groupEnd();
   return snapshot;
 }
 window.debugStoneIncome=debugStoneIncome;
+
+function closeStoneDebugPanel(){
+  document.getElementById('stone-debug-panel')?.remove();
+}
+
+function showStoneDebugPanel(){
+  closeStoneDebugPanel();
+  const data=getStoneDebugSnapshot();
+  const mineSummary=data.mineBuildingState
+    ? `id: ${data.mineBuildingState.id}\nlevel: ${data.mineBuildingState.level}`
+    : 'No mine building entry found';
+  const panel=document.createElement('div');
+  panel.id='stone-debug-panel';
+  panel.style.cssText=`position:fixed;inset:0;background:rgba(5,4,2,.82);z-index:1200;
+    display:flex;align-items:flex-end;justify-content:center;padding:16px;`;
+  panel.innerHTML=`
+    <div style="width:min(100%,420px);max-height:min(78vh,680px);overflow:auto;
+      background:linear-gradient(180deg,rgba(21,17,10,.98),rgba(12,9,5,.98));
+      border:1px solid rgba(201,168,76,.28);border-radius:10px;
+      box-shadow:0 18px 45px rgba(0,0,0,.55);padding:14px 14px 12px;color:var(--parchment)">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">
+        <div>
+          <div style="font-family:'Cinzel',serif;font-size:13px;letter-spacing:1.1px;color:var(--gold)">Temporary Debug UI</div>
+          <div style="font-size:11px;color:var(--stone-light);line-height:1.35">Stone income diagnostic for mobile testing</div>
+        </div>
+        <button onclick="closeStoneDebugPanel()" style="flex:0 0 auto;background:none;border:1px solid rgba(201,168,76,.22);
+          border-radius:4px;color:var(--stone-light);padding:4px 8px;font-size:16px;line-height:1;cursor:pointer">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.12);border-radius:6px;padding:8px">
+          <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px">Version</div>
+          <div style="font-size:12px;color:var(--gold);font-family:'Cinzel',serif">v${data.appVersion}</div>
+        </div>
+        <div style="background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.12);border-radius:6px;padding:8px">
+          <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px">Cache</div>
+          <div style="font-size:12px;color:var(--gold);font-family:'Cinzel',serif">${data.cacheVersion}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.10);border-radius:6px;padding:8px">
+          <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px">Stone Amount</div>
+          <div style="font-size:15px;color:var(--parchment);font-family:'Cinzel',serif">${Math.floor(data.stoneAmount||0)}</div>
+        </div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.10);border-radius:6px;padding:8px">
+          <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px">Stone Rate</div>
+          <div style="font-size:15px;color:var(--parchment);font-family:'Cinzel',serif">${Number(data.stoneRate||0).toFixed(2)}/min</div>
+        </div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.10);border-radius:6px;padding:8px">
+          <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px">Effective Rate</div>
+          <div style="font-size:15px;color:var(--parchment);font-family:'Cinzel',serif">${Number(data.effectiveStoneRate||0).toFixed(2)}/min</div>
+        </div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.10);border-radius:6px;padding:8px">
+          <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px">Early Boost</div>
+          <div style="font-size:15px;color:var(--parchment);font-family:'Cinzel',serif">${Number(data.earlyBoost||0).toFixed(2)}x</div>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.10);border-radius:6px;padding:10px;margin-bottom:10px">
+        <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Quarry Summary</div>
+        <div style="font-size:12px;color:var(--parchment);line-height:1.45">blvl('mine'): <span style="color:var(--gold)">${data.mineLevel}</span></div>
+        <div style="font-size:12px;color:var(--parchment);line-height:1.45">Total building levels: <span style="color:var(--gold)">${data.totalBuildingLevels}</span></div>
+        <div style="font-size:12px;color:var(--parchment);line-height:1.45">Stonemasons complete: <span style="color:${data.stonemasonsCompleted?'var(--forest-light)':'var(--stone-light)'}">${data.stonemasonsCompleted}</span></div>
+        <div style="font-size:12px;color:var(--parchment);line-height:1.45">Rate bonus table: <span style="color:var(--gold)">${JSON.stringify(data.mineRateBonus)}</span></div>
+      </div>
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.10);border-radius:6px;padding:10px;margin-bottom:10px">
+        <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Mine Building Entry</div>
+        <pre style="margin:0;white-space:pre-wrap;word-break:break-word;font:11px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--parchment)">${mineSummary}</pre>
+      </div>
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.10);border-radius:6px;padding:10px">
+        <div style="font-size:10px;color:var(--stone-light);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Stone Quarry Definition</div>
+        <pre style="margin:0;white-space:pre-wrap;word-break:break-word;font:11px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--parchment)">${JSON.stringify({
+          id:data.stoneQuarryDefinition?.id||null,
+          name:data.stoneQuarryDefinition?.name||null,
+          max:data.stoneQuarryDefinition?.max||null,
+          req:data.stoneQuarryDefinition?.req||null,
+          costLevel1:data.stoneQuarryDefinition?.cost?data.stoneQuarryDefinition.cost(1):null,
+          effectAtMineLevel:data.stoneQuarryDefinition?.eff?data.stoneQuarryDefinition.eff(data.mineLevel||0):null
+        },null,2)}</pre>
+      </div>
+    </div>`;
+  panel.addEventListener('click',e=>{ if(e.target===panel)closeStoneDebugPanel(); });
+  document.body.appendChild(panel);
+}
+window.showStoneDebugPanel=showStoneDebugPanel;
+window.closeStoneDebugPanel=closeStoneDebugPanel;
 
 // ==== INIT ====
 function init(){
@@ -2886,6 +2974,10 @@ function renderFaction(){
         <div class="ftrait-name">Local Chronicle</div>
         <div class="ftrait-desc">Clear the save on this device and restart from a fresh kingdom if you want a clean early-game test.</div>
       </div>
+      <button onclick="showStoneDebugPanel()"
+        style="width:100%;padding:8px;background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.22);border-radius:4px;color:var(--gold);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-bottom:8px">
+        Temporary Debug Stone
+      </button>
       <button onclick="clearLocalSave()"
         style="width:100%;padding:8px;background:rgba(138,45,45,.12);border:1px solid rgba(138,45,45,.4);border-radius:4px;color:var(--blood-light);font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer">
         Clear Local Save
