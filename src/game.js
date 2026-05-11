@@ -897,6 +897,10 @@ function isFrontierTarget(farm){
   return isStronghold(farm)||isOrcHorde(farm);
 }
 
+function hasAnyRaidVictory(){
+  return G.combatLog.some(e=>e.type==='victory');
+}
+
 function scaledFarmLoot(farm){
   if(!farm?.lootScale)return farm?.loot||{};
   const loot={};
@@ -908,7 +912,21 @@ function scaledFarmLoot(farm){
 
 function canSeeFarm(farm){
   if(isOrcHorde(farm))return orcHordeUnlocked();
-  return true;
+  if(isStronghold(farm)){
+    return G.seasonWeek>=Math.max(1,(farm.captureWeek||1)-1) || capturedStrongholds().length>0 || governedVillageCount()>=2;
+  }
+  if(['n1','n2','n3'].includes(farm.id))return true;
+  if(['n4','n6'].includes(farm.id))return hasAnyRaidVictory()||blvl('barracks')>=2;
+  if(['n5','n7'].includes(farm.id))return governedVillageCount()>=1||blvl('barracks')>=2;
+  if(['n8'].includes(farm.id))return governedVillageCount()>=2||blvl('barracks')>=3;
+  return false;
+}
+
+function combatRevealHint(){
+  if(!hasAnyRaidVictory())return 'Win your first raid to reveal tougher targets.';
+  if(governedVillageCount()===0)return 'Bring a village under tribute to open the wider frontier.';
+  if(governedVillageCount()<2)return 'Grow your realm to reveal the far trade routes and frontier sites.';
+  return '';
 }
 
 function governedVillageCount(){
@@ -1518,7 +1536,7 @@ function renderCombat(){
       }).join('')}
     </div>`:'';
 
-  const npcHtml=G.npcFarms.filter(canSeeFarm).map(farm=>{
+  const renderFarmCard=farm=>{
     const state=getVillageState(farm.id);
     const af=G.autoFarm[farm.id]||{enabled:false,floor:20};
     const hasRaidHistory=G.combatLog.some(e=>e.msg.includes(farm.name)&&e.type==='victory');
@@ -1582,7 +1600,7 @@ const frontierButtons=isCapturedFrontier?`
         :((state.control||0)>=controlNeed&&governedVillageCount()>=currentAdminCap()&&!isFrontierTarget(farm))
           ?`<div style="font-size:10px;color:var(--blood-light);margin-top:8px;font-style:italic">Administration full (${governedVillageCount()}/${currentAdminCap()}). Raise Citadel or advance a dynasty.</div>`
           :'';
-    return`<div class="npc-card ${farm.available?'':''}">
+    return`<div class="npc-card ${isFrontierTarget(farm)?'frontier-target':'primary-target'} ${farm.available&&canBeat&&!state.governed&&!isCapturedFrontier?'can-raid':''}">
       <div class="npc-header">
         <span class="npc-name">${farm.icon} ${farm.name}</span>
         <span class="npc-level">Lv ${farm.level}</span>
@@ -1615,10 +1633,21 @@ const frontierButtons=isCapturedFrontier?`
         ${actionButtons}
         `}
     </div>`;
-  }).join('');
+  };
+  const visibleFarms=G.npcFarms.filter(canSeeFarm);
+  const villageTargets=visibleFarms.filter(f=>!isFrontierTarget(f));
+  const frontierTargets=visibleFarms.filter(isFrontierTarget);
+  const revealHint=combatRevealHint();
+  const npcHtml=villageTargets.map(renderFarmCard).join('');
+  const frontierHtml=frontierTargets.length?`
+    <div class="section section-subtle">
+      <div class="section-title">🛡 Frontier</div>
+      <div class="section-lead">These sites matter later in the season. They are kept quieter until your realm is ready to push outward.</div>
+      <div class="npc-list">${frontierTargets.map(renderFarmCard).join('')}</div>
+    </div>`:'';
 
   const raidReportHtml=G.raidReports.length?`
-    <div class="section">
+    <div class="section section-subtle">
       <div class="section-title">🏷 Raid Efficiency</div>
       <div class="combat-log">
         ${G.raidReports.map(r=>`<div class="report-card ${r.victory?'victory':'defeat'}">
@@ -1630,7 +1659,7 @@ const frontierButtons=isCapturedFrontier?`
     </div>`:'';
 
   const combatLogHtml=G.combatLog.length?`
-    <div class="section">
+    <div class="section section-subtle">
       <div class="section-title">📜 Battle Reports</div>
       <div class="combat-log">
         ${G.combatLog.map(e=>`<div class="clog-entry ${e.type||''}"><span style="font-size:9px;color:var(--gold-dark);font-family:'Cinzel',serif">${e.time}</span> ${e.msg}</div>`).join('')}
@@ -1646,10 +1675,12 @@ const frontierButtons=isCapturedFrontier?`
     </div>
     ${activeRaidsHtml}
     <div class="section">
-      <div class="section-title">🗺 NPC Farms</div>
-      <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-bottom:8px">Defeat NPC villages to steal resources, build control, then bring them under your banner as tributaries.</div>
+      <div class="section-title">🗺 Raiding Grounds</div>
+      <div class="section-lead">Defeat nearby villages for resources, then turn them into tributaries once their control bar is filled.</div>
+      ${revealHint?`<div class="combat-reveal-hint">${revealHint}</div>`:''}
       <div class="npc-list">${npcHtml}</div>
     </div>
+    ${frontierHtml}
     ${raidReportHtml}
     ${combatLogHtml}`;
   Object.entries(sendValues).forEach(([id,val])=>{
@@ -2275,9 +2306,9 @@ function renderResources(){
     ? 'First long-term goal: break a village twice, fill its control bar, then crown it as a tributary.'
     : `Realm goal: hold ${governedVillageCount()}/${currentAdminCap()} governed villages and keep tribute flowing.`;
   const rows=[
-    boost>1?`<div class="boost-row">⚡ Early Kingdom Bonus: ${boost.toFixed(1)}x income active</div>`:'',
-    `<div class="boost-row" style="color:var(--gold)">👑 Realm: ${governedVillageCount()}/${currentAdminCap()} villages governed · Tribute ${tributeText}</div>`,
-    `<div class="boost-row" style="color:var(--stone-light);font-style:italic">${goalText}</div>`
+    boost>1?`<div class="boost-row boost-row-strong">⚡ Early Kingdom Bonus: ${boost.toFixed(1)}x income active</div>`:'',
+    governedVillageCount()>0?`<div class="boost-row boost-row-realm">👑 Realm: ${governedVillageCount()}/${currentAdminCap()} villages governed · Tribute ${tributeText}</div>`:'',
+    `<div class="boost-row boost-row-hint">${goalText}</div>`
   ].filter(Boolean).join('');
   el.innerHTML=rows+
     Object.entries(G.resources).map(([k,r])=>{
@@ -2286,15 +2317,18 @@ function renderResources(){
       const nearCap=pct>=95;
       const gain=effectiveResourceRate(k);
       const capText=resourceCapText(k,r);
-      return`<div class="rc" data-resource-card="${k}" role="button" tabindex="0" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()" title="Storage time" style="${nearCap?'border-color:rgba(192,57,43,.4);':''}">
-        <div class="rc-top"><div class="rc-icon">${r.icon}</div><div class="rc-name">${r.name}</div></div>
-        <div class="rc-amount" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()">${Math.floor(r.amount)}</div>
-        <div class="rc-rate ${gain<0?'neg':''}" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()">${gain>0?'+':''}${gain.toFixed(1)}/min</div>
+      return`<div class="rc ${nearCap?'near-cap':''}" data-resource-card="${k}" role="button" tabindex="0" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()" title="Storage time" style="${nearCap?'border-color:rgba(192,57,43,.4);':''}">
+        <div class="rc-top">
+          <div class="rc-ident"><div class="rc-icon">${r.icon}</div><div class="rc-name">${r.name}</div></div>
+          <div class="rc-amount" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()">${Math.floor(r.amount)}</div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-pill rc-rate ${gain<0?'neg':''}" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()">${gain>0?'+':''}${gain.toFixed(1)}/min</span>
+          <span class="rc-pill rc-stock">${Math.floor(r.amount)}/${r.max}</span>
+        </div>
         <div class="rc-captext">${capText}</div>
         <div class="rc-capbar"><div class="rc-capfill" style="width:${pct}%;background:${capColor}"></div></div>
-        <div style="font-size:8px;color:var(--stone-light);margin-top:2px">${Math.floor(r.amount)}/${r.max}
-          ${nearCap?`<span style="color:var(--blood-light)"> ⚠ Full</span>`:''}
-        </div>
+        ${nearCap?`<div class="rc-warning">⚠ Near full</div>`:''}
       </div>`;
     }).join('');
 }
