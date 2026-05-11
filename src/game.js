@@ -923,7 +923,7 @@ function canSeeFarm(farm){
 }
 
 function combatRevealHint(){
-  if(!hasAnyRaidVictory())return 'Win your first raid to reveal tougher targets.';
+  if(!hasAnyRaidVictory())return 'When your first warband is ready, test it against the Peasant Village. Harder lands reveal themselves after that first victory.';
   if(governedVillageCount()===0)return 'Bring a village under tribute to open the wider frontier.';
   if(governedVillageCount()<2)return 'Grow your realm to reveal the far trade routes and frontier sites.';
   return '';
@@ -1455,7 +1455,7 @@ function renderCombat(){
   if(barracksLvl===0){
     tab.innerHTML=`<div class="section"><div class="section-title">⚔ Combat</div>
       <div style="font-size:13px;color:var(--stone-light);font-style:italic;padding:8px 0">
-        Build the King's Barracks to raise an army.
+        Let the realm gather strength first. When the Market and Iron Foundry are in place, raise the King's Barracks and call your first warband.
       </div></div>`;
     return;
   }
@@ -1676,7 +1676,7 @@ const frontierButtons=isCapturedFrontier?`
     ${activeRaidsHtml}
     <div class="section">
       <div class="section-title">🗺 Raiding Grounds</div>
-      <div class="section-lead">Defeat nearby villages for resources, then turn them into tributaries once their control bar is filled.</div>
+      <div class="section-lead">Beyond the walls lie villages ripe for raiding. Repeated victories bend them toward your banner, until tribute begins to flow back to the crown.</div>
       ${revealHint?`<div class="combat-reveal-hint">${revealHint}</div>`:''}
       <div class="npc-list">${npcHtml}</div>
     </div>
@@ -1936,7 +1936,7 @@ function init(){
   initCombat();
   normalizeDerivedBuildingState();
   addLog('Your kingdom of Arnethia rises from humble beginnings.','important');
-  addLog('Build farms and mills. Discover what lies ahead.');
+  addLog('Raise storehouses, mills, and quarries first. Let the realm gather strength before you call the banners to war.');
 
   // iOS Safari fix — attach touchend listeners to all tab buttons
   // This fires before the 300ms click delay and works reliably on iOS
@@ -2303,7 +2303,7 @@ function renderResources(){
   const tribute=totalVillageTributePerMinute();
   const tributeText=Object.keys(tribute).length?Object.entries(tribute).map(([k,v])=>`${G.resources[k]?.icon||k}${v.toFixed(1)}/m`).join(' '):'No tributaries yet';
   const goalText=governedVillageCount()===0
-    ? 'First long-term goal: break a village twice, fill its control bar, then crown it as a tributary.'
+    ? 'First long-term goal: strengthen the realm, win your first raids, and bring a nearby village beneath your banner as a tributary.'
     : `Realm goal: hold ${governedVillageCount()}/${currentAdminCap()} governed villages and keep tribute flowing.`;
   const rows=[
     boost>1?`<div class="boost-row boost-row-strong">⚡ Early Kingdom Bonus: ${boost.toFixed(1)}x income active</div>`:'',
