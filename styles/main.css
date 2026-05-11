@@ -123,6 +123,7 @@ body::before{content:'';position:fixed;inset:0;
 
 /* BUILDINGS */
 .blist{display:flex;flex-direction:column;gap:8px;}
+.build-toolbar{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
 .bcard{background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.1);border-radius:4px;padding:11px;
   transition:all .2s;position:relative;overflow:hidden;}
 .bcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--gold);opacity:0;transition:opacity .2s;}
@@ -206,6 +207,15 @@ body::before{content:'';position:fixed;inset:0;
 .qbtn:hover:not(:disabled){background:rgba(139,26,26,.25);border-color:var(--blood-light);}
 .qbtn:disabled{opacity:.35;cursor:not-allowed;}
 .qbtn.ret{background:rgba(74,122,50,.12);border-color:rgba(74,122,50,.35);color:var(--forest-light);}
+.hero-actions{display:flex;gap:6px;margin-top:6px;align-items:stretch;}
+.hero-auto-btn{flex:0 0 auto;min-width:88px;padding-inline:10px;}
+.train-entry{display:flex;gap:4px;margin-top:6px;align-items:center;}
+.train-max-btn{width:auto;flex:0 0 auto;padding-inline:10px;}
+
+@media(max-width:480px){
+  .hero-actions{flex-direction:column;}
+  .hero-auto-btn{width:100%;min-width:0;}
+}
 
 /* FACTION */
 .ftrait{background:rgba(201,168,76,.04);border:1px solid rgba(201,168,76,.1);border-radius:4px;padding:8px 10px;margin-bottom:6px;}

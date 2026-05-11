@@ -66,4 +66,7 @@ const BD=[
   {id:'armoury',name:'Armoury',icon:'🗡',max:6,tier:2,desc:'Iron stockpiles for weapons and armour.',
    eff:l=>`+${l*150} iron cap`,cost:l=>({stone:bCost(18,l),wood:bCost(10,l)}),
    onBuild:l=>{G.resources.iron.max+=150;G.storageLevels.armoury=l;},req:{ironworks:2}},
+  {id:'manawell',name:'Mana Well',icon:'🔮',max:6,tier:3,desc:'Arcane reservoirs hold the power drawn from the ley lines.',
+   eff:l=>`+${l*150} mana cap`,cost:l=>({stone:bCost(20,l),gold:bCost(16,l),iron:bCost(6,l)}),
+   onBuild:l=>{G.resources.mana.max+=150;G.storageLevels.manawell=l;},req:{tower:1}},
 ];
