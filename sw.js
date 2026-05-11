@@ -1,4 +1,4 @@
-const CACHE = 'hc-v37';
+const CACHE = 'hc-v38';
 const ASSETS = [
   './',
   './index.html',
