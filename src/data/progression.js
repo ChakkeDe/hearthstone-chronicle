@@ -26,4 +26,4 @@ const PRESTIGE_ABILITIES=[
 ];
 
 const SEASON_WEEKS=6;
-const TICKS_PER_WEEK=300; // 5 real minutes per in-game week for prototype (would be 7 days in production)
+const TICKS_PER_WEEK=360; // 6 real minutes per in-game week for prototype (would be 7 days in production)

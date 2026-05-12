@@ -482,11 +482,12 @@ function seasonTick(ticks=1){
   while(G.seasonTick>=TICKS_PER_WEEK){
     G.seasonTick-=TICKS_PER_WEEK;
     G.seasonWeek++;
-    addLog(`Season ${G.season} - Week ${G.seasonWeek} begins.`,'important');
     if(G.seasonWeek>SEASON_WEEKS){
       endSeason();
       break;
     }
+    addLog(`The annals turn. Season ${G.season}, Week ${G.seasonWeek} begins across the realm.`,'important');
+    showOverlay(`Season ${G.season} - Week ${G.seasonWeek}\nA new week dawns over Arnethia.`, 'success', 'Chronicle Updated');
   }
 }
 
@@ -902,6 +903,10 @@ function hasAnyRaidVictory(){
   return G.combatLog.some(e=>e.type==='victory');
 }
 
+function raidVictoryCount(){
+  return G.combatLog.filter(e=>e.type==='victory').length;
+}
+
 function scaledFarmLoot(farm){
   if(!farm?.lootScale)return farm?.loot||{};
   const loot={};
@@ -916,18 +921,32 @@ function canSeeFarm(farm){
   if(isStronghold(farm)){
     return G.seasonWeek>=Math.max(1,(farm.captureWeek||1)-1) || capturedStrongholds().length>0 || governedVillageCount()>=2;
   }
-  if(['n1','n2','n3'].includes(farm.id))return true;
-  if(['n4','n6'].includes(farm.id))return hasAnyRaidVictory()||blvl('barracks')>=2;
-  if(['n5','n7'].includes(farm.id))return governedVillageCount()>=1||blvl('barracks')>=2;
-  if(['n8'].includes(farm.id))return governedVillageCount()>=2||blvl('barracks')>=3;
+  const victories=raidVictoryCount();
+  if(farm.id==='n1')return true;
+  if(['n2','n3'].includes(farm.id))return victories>=1;
+  if(['n4','n6'].includes(farm.id))return victories>=3 || blvl('barracks')>=2;
+  if(['n5','n7'].includes(farm.id))return governedVillageCount()>=1 || victories>=5 || blvl('barracks')>=3;
+  if(farm.id==='n8')return governedVillageCount()>=2 || victories>=7 || blvl('barracks')>=4;
   return false;
 }
 
 function combatRevealHint(){
-  if(!hasAnyRaidVictory())return 'When your first warband is ready, test it against the Peasant Village. Harder lands reveal themselves after that first victory.';
-  if(governedVillageCount()===0)return 'Bring a village under tribute to open the wider frontier.';
-  if(governedVillageCount()<2)return 'Grow your realm to reveal the far trade routes and frontier sites.';
+  const victories=raidVictoryCount();
+  if(victories===0)return 'Only the Peasant Village lies plainly before your scouts. Win there first, and the nearby roads and crossings will begin to reveal themselves.';
+  if(victories<3)return 'Your first victory has stirred the borderlands. River Crossing and the Abandoned Fort now lie within reach.';
+  if(governedVillageCount()===0)return 'Repeated victories will push the realm outward. Bring a village under tribute to reveal the wider frontier.';
+  if(governedVillageCount()<2)return 'Your banner now carries farther. Keep raiding and governing villages to uncover the far trade routes and frontier sites.';
   return '';
+}
+
+function weekUnlockLead(){
+  const upcoming=G.npcFarms
+    .filter(f=>isStronghold(f)&&G.seasonWeek<(f.captureWeek||1))
+    .sort((a,b)=>(a.captureWeek||99)-(b.captureWeek||99))[0];
+  if(!upcoming)return '';
+  const weeksAway=(upcoming.captureWeek||1)-G.seasonWeek;
+  if(weeksAway<=0)return '';
+  return `${upcoming.name} unlocks in Week ${upcoming.captureWeek}${weeksAway>0?` (${weeksAway} week${weeksAway!==1?'s':''} away)`:''}.`;
 }
 
 function governedVillageCount(){
@@ -1570,7 +1589,7 @@ function renderCombat(){
       ?(state.captured
         ?`Captured · Defence ${state.defenseWins||0}/3 · Garrison ${garrisonText}`
         :(G.seasonWeek<(farm.captureWeek||1)
-          ?`Frontier raid site · Capture unlocks in week ${farm.captureWeek}`
+          ?`${farm.name} unlocks in Week ${farm.captureWeek} · ${Math.max(1,(farm.captureWeek||1)-G.seasonWeek)} week${Math.max(1,(farm.captureWeek||1)-G.seasonWeek)!==1?'s':''} to prepare`
           :`Control ${Math.floor(state.control||0)}/${controlNeed} · Capture ready once control is filled`))
       :(isOrcHorde(farm)
         ?(state.captured
@@ -1640,7 +1659,7 @@ const frontierButtons=isCapturedFrontier?`
   const frontierHtml=frontierTargets.length?`
     <div class="section section-subtle">
       <div class="section-title">🛡 Frontier</div>
-      <div class="section-lead">These sites matter later in the season. They are kept quieter until your realm is ready to push outward.</div>
+      <div class="section-lead">These sites matter later in the season. They are kept quieter until your realm is ready to push outward.${weekUnlockLead()?` ${weekUnlockLead()}`:''}</div>
       <div class="npc-list">${frontierTargets.map(renderFarmCard).join('')}</div>
     </div>`:'';
 
@@ -3034,6 +3053,7 @@ function renderFaction(){
   const path=VICTORY_PATHS[G.victoryPath];
   const seasonPct=Math.round((G.seasonWeek/SEASON_WEEKS)*100);
   const weeksLeft=SEASON_WEEKS-G.seasonWeek;
+  const nextWeekLead=weekUnlockLead();
   const tribute=totalVillageTributePerMinute();
   const governed=G.npcFarms.filter(f=>getVillageState(f.id).governed);
   const assignedArmyHeroes=G.heroes.filter(h=>h.assignment==='army');
@@ -3136,6 +3156,7 @@ function renderFaction(){
       <div style="height:6px;background:rgba(201,168,76,.1);border-radius:3px;overflow:hidden;margin-bottom:10px">
         <div style="height:100%;width:${seasonPct}%;background:linear-gradient(90deg,var(--gold-dark),var(--gold));border-radius:3px;transition:width 1s"></div>
       </div>
+      ${nextWeekLead?`<div style="font-size:11px;color:var(--gold-dark);font-style:italic;margin-bottom:10px">${nextWeekLead}</div>`:''}
       ${G.seasonComplete?`<div style="font-size:12px;color:var(--gold)">Season complete. Advance your dynasty to begin the next chapter.</div>`:
       (path?`<div style="font-size:12px;color:var(--forest-light)">✓ ${path.icon} ${path.label} · +${path.bonus}% renown bonus active</div>`:
       `<div style="font-size:12px;color:var(--stone-light);font-style:italic">No victory path achieved yet. Complete a research branch.</div>`)}
