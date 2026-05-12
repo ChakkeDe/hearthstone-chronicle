@@ -44,7 +44,7 @@ const G={
   hospital:{capacity:100,recovering:0,recoverEnd:0},
   npcFarms:[],activeRaids:[],combatLog:[],
   raidReports:[],
-  autoFarm:{},                    // {farmId: {enabled, troopFloor, lastCheck}}
+  autoFarm:{},                    // {farmId: {enabled, ...legacySettings}}
   // ==== DEFENCE ====
   wallDefence:0,
   garrison:{infantry:0,archers:0,cavalry:0},
@@ -1539,7 +1539,7 @@ function renderCombat(){
 
   const renderFarmCard=farm=>{
     const state=getVillageState(farm.id);
-    const af=G.autoFarm[farm.id]||{enabled:false,floor:20};
+    const af=G.autoFarm[farm.id]||{enabled:false};
     const hasRaidHistory=G.combatLog.some(e=>e.msg.includes(farm.name)&&e.type==='victory');
     const activeRaid=G.activeRaids.find(r=>r.farmId===farm.id);
     const lootStr=Object.entries(scaledFarmLoot(farm)).map(([r,v])=>`${G.resources[r]?.icon||r}${v}`).join(' ');
@@ -1555,20 +1555,17 @@ function renderCombat(){
     const autoControls=`<div class="autofarm-row">
           <div class="toggle-wrap">
             <div class="toggle ${af.enabled?'on':''}" onclick="toggleAutoFarm('${farm.id}')"></div>
-            <span class="toggle-label">Auto-farm ${af.enabled?'ON ⚡':'OFF'}</span>
+            <span class="toggle-label">Auto-raid ${af.enabled?'ON ⚡':'OFF'}</span>
           </div>
           <button class="train-btn" onclick="disableAutoFarm('${farm.id}')" style="width:auto;padding-inline:10px">Stop Auto</button>
         </div>
-        <div class="threshold-row">
-          <span>Min troops:</span>
-          <input type="range" min="10" max="50" step="5" value="${af.floor||20}"
-            oninput="setAutoFarmFloor('${farm.id}',this.value)"
-            style="flex:1;accent-color:var(--gold);">
-          <span>${af.floor||20}%</span>
+        <div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">
+          Auto raids only launch while the game is open and your available army can beat this target.
         </div>
-        ${af.enabled&&activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Auto-farm will stop after the current raid returns.</div>`:''}
-        ${af.enabled&&!farm.available&&!activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Auto-farm is armed and waiting for this target to reopen.</div>`:''}
-        ${!hasRaidHistory&&!af.enabled&&!activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Win one raid here to unlock auto-farm.</div>`:''}`;
+        ${af.enabled&&activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Auto-raid will stop after the current raid returns.</div>`:''}
+        ${af.enabled&&!farm.available&&!activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Auto-raid is armed and waiting for this target to reopen.</div>`:''}
+        ${af.enabled&&farm.available&&!activeRaid&&!canBeat?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Waiting for enough available army power to beat ${farm.name}.</div>`:''}
+        ${!hasRaidHistory&&!af.enabled&&!activeRaid?`<div style="font-size:10px;color:var(--stone-light);margin-top:6px;font-style:italic">Win one raid here to unlock auto-raids.</div>`:''}`;
     const frontierStatus=isStronghold(farm)
       ?(state.captured
         ?`Captured · Defence ${state.defenseWins||0}/3 · Garrison ${garrisonText}`
@@ -1708,7 +1705,8 @@ function setTrainMax(type){
 }
 
 function setAutoFarmFloor(farmId,val){
-  if(!G.autoFarm[farmId])G.autoFarm[farmId]={enabled:false,floor:20};
+  if(!G.autoFarm[farmId])G.autoFarm[farmId]={enabled:false};
+  // Legacy no-op retained for save/UI compatibility with older builds.
   G.autoFarm[farmId].floor=parseInt(val);
 }
 
@@ -1834,20 +1832,20 @@ function warChestDecayTick(){
 
 // ==== AUTO-FARM ====
 function toggleAutoFarm(farmId){
-  if(!G.autoFarm[farmId]) G.autoFarm[farmId]={enabled:false,floor:20};
+  if(!G.autoFarm[farmId]) G.autoFarm[farmId]={enabled:false};
   G.autoFarm[farmId].enabled=!G.autoFarm[farmId].enabled;
-  if(G.autoFarm[farmId].enabled) addLog(`Auto-farm enabled for ${G.npcFarms.find(f=>f.id===farmId)?.name}.`);
-  else addLog(`Auto-farm stopped for ${G.npcFarms.find(f=>f.id===farmId)?.name}.`);
+  if(G.autoFarm[farmId].enabled) addLog(`Auto-raid enabled for ${G.npcFarms.find(f=>f.id===farmId)?.name}. It will only launch while the game is open and your available army can win.`);
+  else addLog(`Auto-raid stopped for ${G.npcFarms.find(f=>f.id===farmId)?.name}.`);
   renderCombat();
 }
 
 function disableAutoFarm(farmId){
   if(!G.autoFarm[farmId]){
-    G.autoFarm[farmId]={enabled:false,floor:20};
+    G.autoFarm[farmId]={enabled:false};
   }
   const wasEnabled=!!G.autoFarm[farmId].enabled;
   G.autoFarm[farmId].enabled=false;
-  if(wasEnabled)addLog(`Auto-farm stopped for ${G.npcFarms.find(f=>f.id===farmId)?.name}.`);
+  if(wasEnabled)addLog(`Auto-raid stopped for ${G.npcFarms.find(f=>f.id===farmId)?.name}.`);
   renderCombat();
 }
 
@@ -1858,29 +1856,7 @@ function checkAutoFarm(){
     if(!af?.enabled||!farm.available)return;
     if(getVillageState(farm.id).governed)return;
     if(G.activeRaids.find(r=>r.farmId===farm.id))return;
-
-    // Check troop floor
-    const totalAvail=Object.values(G.troops).reduce((s,t)=>s+t.available,0);
-    const totalAll=Object.values(G.troops).reduce((s,t)=>s+t.total,0);
-    const floorPct=(af.floor||20)/100;
-    if(totalAvail<totalAll*floorPct){
-      if(!af._warned){
-        showOverlay(`Auto-farm paused — troops below ${af.floor}% threshold`,'danger','Auto-Farm');
-        af._warned=true;
-      }
-      return;
-    }
-    af._warned=false;
-
-    // Efficiency check: compare loot value vs expected repair cost
-    const lootVal=Object.entries(farm.loot).reduce((s,[r,v])=>s+(r==='gold'?v:v*0.5),0);
-    const repairCost=totalAvail*0.1*5; // rough estimate
-    if(repairCost>lootVal*0.8){
-      showOverlay(`Auto-farm paused — repair costs outweigh loot at ${farm.name}`,'danger','Efficiency Warning');
-      af.enabled=false;
-      renderCombat();
-      return;
-    }
+    if(calcReadyTroopPower()<farm.def)return;
 
     const raidPlan=planRaidTroops(farm);
     if(raidPlan.canBeat) attackNPC(farm.id,raidPlan.sent);

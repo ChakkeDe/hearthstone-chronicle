@@ -120,6 +120,23 @@ function sanitizeManaBuffs(savedManaBuffs){
   });
 }
 
+function sanitizeAutoFarm(savedAutoFarm){
+  if(!isPlainObject(savedAutoFarm)) return {};
+  const next = {};
+  Object.entries(savedAutoFarm).forEach(([farmId, value])=>{
+    if(!isPlainObject(value)) return;
+    next[farmId] = {
+      ...value,
+      enabled: !!value.enabled,
+    };
+    if(Number.isFinite(value.floor)) next[farmId].floor = value.floor;
+    if(Number.isFinite(value.troopFloor) && !Number.isFinite(next[farmId].floor)){
+      next[farmId].floor = value.troopFloor;
+    }
+  });
+  return next;
+}
+
 async function cloudSave(){
   if(_suspendPersistence) return;
   if(!G.supabaseUrl || !G.supabaseKey) return;
@@ -320,7 +337,7 @@ function applyLoadedState(rawSave){
   G.activeRaids = asArray(s.activeRaids, []).filter(isPlainObject);
   G.combatLog = asArray(s.combatLog, []).filter(isPlainObject);
   G.raidReports = asArray(s.raidReports, []).filter(isPlainObject);
-  G.autoFarm = isPlainObject(s.autoFarm) ? s.autoFarm : {};
+  G.autoFarm = sanitizeAutoFarm(s.autoFarm);
   G.wallDefence = Math.max(0, asFiniteNumber(s.wallDefence, G.wallDefence));
   sanitizeGarrison(s.garrison);
   G.watchtowerUnlocked = !!s.watchtowerUnlocked;
