@@ -104,8 +104,8 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '1.2.8';
-const CACHE_VERSION = 'hc-v50';
+const APP_VERSION = '1.2.9';
+const CACHE_VERSION = 'hc-v51';
 const RELIC_STACK_CAP = 5;
 
 const BASE_RESOURCE_MAX={gold:900,food:900,wood:900,stone:900,iron:600,mana:400};
