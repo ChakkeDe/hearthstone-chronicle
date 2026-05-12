@@ -1221,8 +1221,8 @@ function planRaidTroops(farm){
   const targetPower=farm.def||0;
   const targetCarry=farmLootTotal(farm);
 
-  // Prefer fast, high-capacity troops first so auto-farm can spread raids efficiently.
-  ['cavalry','infantry','archers'].forEach(type=>{
+  // Prefer fast, high-capacity troops first, then bring siege if more raw power is needed.
+  ['cavalry','infantry','archers','siege'].forEach(type=>{
     const def=TROOP_DEF[type];
     const avail=G.troops[type]?.available||0;
     if(!def||avail<=0)return;
@@ -1639,7 +1639,7 @@ const frontierButtons=isCapturedFrontier?`
         ${isFrontierTarget(farm)?'':autoControls}`
         :`<div style="font-size:10px;color:var(--gold-dark);margin-bottom:6px;font-family:'Cinzel',serif">Send troops:</div>
         <div class="troop-send">
-          ${Object.entries(TROOP_DEF).filter(([type])=>blvl('barracks')>=TROOP_DEF[type].reqBarracks&&type!=='siege').map(([type,def])=>`
+          ${Object.entries(TROOP_DEF).filter(([type])=>blvl('barracks')>=TROOP_DEF[type].reqBarracks).map(([type,def])=>`
             <div>
               <div class="send-label">${def.icon} ${def.name} (${G.troops[type].available})</div>
               <input type="number" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="send-input" id="send-${farm.id}-${type}" min="0" max="${G.troops[type].available}" value="0" placeholder="0">
@@ -1886,6 +1886,7 @@ function checkAutoFarm(){
 function startResearch2(id){
   if(blvl('citadel')<3){showSnot('Second queue unlocks at Citadel level 3');return;}
   if(G.activeResearch2){showSnot('Second queue busy');return;}
+  if(G.activeResearch2===id){showSnot('Already in queue 2');return;}
   if(G.research[id]?.completed)return;
   const rDef=allR().find(r=>r.id===id);if(!rDef)return;
   if(rDef.req&&!G.research[rDef.req]?.completed){showSnot('Requires prior research');return;}
@@ -2669,7 +2670,15 @@ function buildBuilding(id){
 
 // ==== RESEARCH ====
 function startResearch(id){
-  if(G.activeResearch){showSnot('Already researching');return;}
+  if(G.activeResearch===id){showSnot('Already in queue 1');return;}
+  if(G.activeResearch2===id){showSnot('Already in queue 2');return;}
+  if(G.activeResearch){
+    if(blvl('citadel')>=3&&!G.activeResearch2){
+      startResearch2(id);
+      return;
+    }
+    showSnot('Research queues are busy');return;
+  }
   if(G.research[id]?.completed)return;
   const rDef=allR().find(r=>r.id===id);
   if(!rDef)return;
@@ -3176,13 +3185,14 @@ function renderResearch(){
       const ok=G.resources[r]?.amount>=a;
       return `<span style="font-size:11px;color:${ok?'var(--parchment-dark)':'var(--blood-light)'}">${G.resources[r]?.icon||r}${a}</span>`;
     }).join(' ');
-    const canQ2=citLvl>=3&&!done&&!locked&&!G.activeResearch2&&G.activeResearch!==rDef.id;
+    const canStartPrimary=!done&&!locked&&!isAct&&!isAct2&&(!G.activeResearch||(citLvl>=3&&!G.activeResearch2));
+    const canQ2=citLvl>=3&&!done&&!locked&&!G.activeResearch2&&G.activeResearch!==rDef.id&&!isAct2;
     return`<div class="ritem ${done?'rcompleted':''} ${locked?'rlocked':''} ${isAct||isAct2?'ractive':''}"
-      onclick="${!done&&!locked&&!G.activeResearch?`startResearch('${rDef.id}')`:''}"
-      style="cursor:${!done&&!locked&&!G.activeResearch?'pointer':'default'}">
+      onclick="${canStartPrimary?`startResearch('${rDef.id}')`:''}"
+      style="cursor:${canStartPrimary?'pointer':'default'}">
       <div class="rname" style="display:flex;justify-content:space-between;align-items:center">
         <span>${done?'✓ ':''}${rDef.name}</span>
-        ${canQ2?`<button onclick="startResearch2('${rDef.id}')" style="font-size:8px;padding:2px 5px;background:rgba(74,122,50,.15);border:1px solid rgba(74,122,50,.3);border-radius:2px;color:var(--forest-light);cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.5px;touch-action:manipulation">+Q2</button>`:''}
+        ${canQ2?`<button onclick="event.stopPropagation();startResearch2('${rDef.id}')" style="font-size:8px;padding:2px 5px;background:rgba(74,122,50,.15);border:1px solid rgba(74,122,50,.3);border-radius:2px;color:var(--forest-light);cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.5px;touch-action:manipulation">+Q2</button>`:''}
       </div>
       <div class="rdesc">${rDef.desc}</div>
       ${locked?`<div style="font-size:11px;color:var(--blood-light);font-style:italic">Requires: ${allR().find(x=>x.id===rDef.req)?.name||rDef.req}</div>`:''}
@@ -3505,6 +3515,7 @@ window.addEventListener('DOMContentLoaded', function(){
     document.body.appendChild(div);
   }
 });
+
 
 
 

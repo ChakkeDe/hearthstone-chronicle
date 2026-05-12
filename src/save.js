@@ -312,6 +312,10 @@ function applyLoadedState(rawSave){
   G.researchProgress = Math.max(0, asFiniteNumber(s.researchProgress, 0));
   G.activeResearch2 = typeof s.activeResearch2 === 'string' ? s.activeResearch2 : null;
   G.researchProgress2 = Math.max(0, asFiniteNumber(s.researchProgress2, 0));
+  if(G.activeResearch && G.activeResearch2 && G.activeResearch === G.activeResearch2){
+    G.activeResearch2 = null;
+    G.researchProgress2 = 0;
+  }
   G.tick = Math.max(0, asFiniteNumber(s.tick, 0));
   G.activeTab = asString(s.activeTab, G.activeTab || 'kingdom');
   G.activeResearchTab = asString(s.activeResearchTab, G.activeResearchTab || 'economy');
