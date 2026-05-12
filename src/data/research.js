@@ -41,11 +41,11 @@ const RD = {
   diplomacy: [
     { id: 'envoys', name: 'Royal Envoys', tier: 1, desc: '+10 gold/min tribute from neutral lands.', cost: { gold: 60, food: 40 }, time: 120,
       eff: () => { G.resources.gold.rate += 10; }, unlocks: ['treaties', 'trade_alliance'] },
-    { id: 'treaties', name: 'Vassal Treaties', tier: 2, desc: 'Men of the West unique. +20 prestige/min.', cost: { gold: 120, food: 60 }, time: 200,
+    { id: 'treaties', name: 'Vassal Treaties', tier: 2, desc: 'Men of the West unique. +20 renown/min.', cost: { gold: 120, food: 60 }, time: 200,
       eff: () => { G.prestigeRate = (G.prestigeRate || 0) + 20; }, req: 'envoys', unlocks: ['high_council'] },
     { id: 'trade_alliance', name: 'Trade Alliance', tier: 2, desc: 'Building costs reduced by 15%.', cost: { gold: 150, iron: 30 }, time: 240,
       eff: () => { G.costReduction = 0.85; }, req: 'envoys' },
-    { id: 'high_council', name: 'High Council of Kings', tier: 3, desc: 'Establish dynastic dominance. +200 prestige.', cost: { gold: 300, mana: 50, iron: 50 }, time: 480,
+    { id: 'high_council', name: 'High Council of Kings', tier: 3, desc: 'Establish dynastic dominance. +200 renown.', cost: { gold: 300, mana: 50, iron: 50 }, time: 480,
       eff: () => { addLog('The High Council convenes. Your dynasty is legend.', 'important'); G.prestige += 200; }, req: 'treaties', unlocks: ['provincial_rule'] },
     { id: 'provincial_rule', name: 'Provincial Rule', tier: 4, desc: '+1 administration capacity and +10% village tribute.', cost: { gold: 420, mana: 80, iron: 90 }, time: 540,
       eff: () => {}, req: 'high_council' },

@@ -39,7 +39,7 @@ const BD = [
     req: { ironworks: 1, market: 1 }, unlocks: ['citadel', 'hospital'] },
 
   { id: 'citadel', name: 'Royal Citadel', icon: '🏰', max: 8, tier: 4, desc: 'The seat of power. Expands caps, unlocks diplomacy and defence.',
-    eff: l => `+${l * 700} caps, +${l * 25} prestige/min, +${l * 50} wall defence`,
+    eff: l => `+${l * 700} caps, +${l * 25} renown/min, +${l * 50} wall defence`,
     cost: l => ({ gold: bCost(80, l), stone: bCost(60, l), iron: bCost(25, l), wood: bCost(40, l) }),
     onBuild: l => {
       Object.values(G.resources).forEach(r => r.max += 700);
