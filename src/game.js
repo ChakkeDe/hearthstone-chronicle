@@ -104,8 +104,8 @@ function relicLabel(id){
   return {relic_gold:'🪙 Merchant\'s Seal',relic_combat:'⚔ Sword of Ages',relic_research:'📚 Ancient Tome'}[id]||id;
 }
 
-const APP_VERSION = '1.2.9';
-const CACHE_VERSION = 'hc-v51';
+const APP_VERSION = '1.2.10';
+const CACHE_VERSION = 'hc-v52';
 const RELIC_STACK_CAP = 5;
 
 const BASE_RESOURCE_MAX={gold:900,food:900,wood:900,stone:900,iron:600,mana:400};
@@ -462,7 +462,7 @@ function checkVictoryPath(){
 
 // ==== PRESTIGE SPENDING ====
 function spendPrestige(ability){
-  if(G.prestigePoints<ability.cost){showSnot('Not enough prestige points');return;}
+  if(G.prestigePoints<ability.cost){showSnot('Not enough renown');return;}
   if(G.tick-ability.lastUsed<ability.cooldown){
     const rem=Math.ceil((ability.cooldown-(G.tick-ability.lastUsed))/60);
     showSnot(`Ability on cooldown — ${rem} min remaining`);return;
@@ -486,8 +486,8 @@ function seasonTick(ticks=1){
       endSeason();
       break;
     }
-    addLog(`The annals turn. Season ${G.season}, Week ${G.seasonWeek} begins across the realm.`,'important');
-    showOverlay(`Season ${G.season} - Week ${G.seasonWeek}\nA new week dawns over Arnethia.`, 'success', 'Chronicle Updated');
+    addLog(`The Chronicle Turns. Season ${G.season}, Week ${G.seasonWeek} begins across the realm.`,'important');
+    showOverlay(`Season ${G.season} - Week ${G.seasonWeek}\nA new week dawns over Arnethia.`, 'success', 'The Chronicle Turns');
   }
 }
 
@@ -506,15 +506,15 @@ function showSeasonEndScreen(finalPrestige, path){
   overlay.id='season-overlay';
   overlay.style.cssText=`position:fixed;inset:0;background:rgba(5,4,2,.97);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;`;
   const relicOptions=[
-    {id:'relic_gold',name:'Merchant\'s Seal',icon:'🪙',desc:'+10% gold income in future dynasties'},
-    {id:'relic_combat',name:'Sword of Ages',icon:'⚔',desc:'+15% hero power in future dynasties'},
-    {id:'relic_research',name:'Ancient Tome',icon:'📚',desc:'-10% research time in future dynasties'},
+    {id:'relic_gold',name:'Merchant\'s Seal',icon:'🪙',desc:'+10% gold income in ages yet to come'},
+    {id:'relic_combat',name:'Sword of Ages',icon:'⚔',desc:'+15% hero power in ages yet to come'},
+    {id:'relic_research',name:'Ancient Tome',icon:'📚',desc:'-10% research time in ages yet to come'},
   ];
   const allRelicsCapped=relicOptions.every(r=>countRelic(r.id)>=RELIC_STACK_CAP);
-  const pathText=path?(path.icon+' '+path.label+' · +'+path.bonus+'% bonus applied'):'Mixed path';
-  const introText=allRelicsCapped?'Your relic vault is full. Advance the dynasty without claiming an extra relic.':'Your realm endures. Choose the legacy that will strengthen it next.';
-  const continueText=allRelicsCapped?'All legacy relics are already at the cap. No additional relic will be granted this season.':'Select a relic to continue';
-  const buttonText=allRelicsCapped?'Advance Dynasty - Relics Maxed':'Advance Dynasty';
+  const pathText=path?(path.icon+' '+path.label+' · +'+path.bonus+'% renown bonus applied'):'The chroniclers mark a balanced path';
+  const introText=allRelicsCapped?'The vault of past ages is full. The dynasty may endure without claiming another heirloom.':'The season is ended. Choose the heirloom that will strengthen the dynasty in the next age.';
+  const continueText=allRelicsCapped?'All relics of past ages are already at the cap. No new heirloom will be granted this age.':'Choose a dynastic heirloom to begin the next age';
+  const buttonText=allRelicsCapped?'Begin the Next Age - Heirlooms Maxed':'Begin the Next Age';
   const relicCards=relicOptions.map(r=>{
     const stacks=countRelic(r.id);
     const capped=stacks>=RELIC_STACK_CAP;
@@ -528,16 +528,16 @@ function showSeasonEndScreen(finalPrestige, path){
   overlay.innerHTML=`
     <div style="font-family:'Cinzel',serif;text-align:center;max-width:400px;width:100%">
       <div style="font-size:11px;letter-spacing:3px;color:var(--gold-dark);text-transform:uppercase;margin-bottom:8px">Season ${G.season} Complete</div>
-      <div style="font-size:26px;color:var(--gold);font-weight:700;margin-bottom:4px">Dynasty ${G.dynasty+1} Ascends</div>
+      <div style="font-size:26px;color:var(--gold);font-weight:700;margin-bottom:4px">The Dynasty Endures</div>
       <div style="font-size:14px;color:var(--parchment-dark);font-style:italic;margin-bottom:20px">${introText}</div>
       <div style="background:rgba(201,168,76,.08);border:1px solid var(--panel-border);border-radius:6px;padding:14px;margin-bottom:20px">
-        <div style="font-size:13px;color:var(--gold-dark);margin-bottom:6px;letter-spacing:1px;text-transform:uppercase">Season Renown</div>
+        <div style="font-size:13px;color:var(--gold-dark);margin-bottom:6px;letter-spacing:1px;text-transform:uppercase">Renown Earned This Season</div>
         <div style="font-size:32px;color:var(--gold);font-weight:700;font-family:'Cinzel',serif">${finalPrestige.toLocaleString()}</div>
         <div style="font-size:12px;color:var(--forest-light);margin-top:4px">${pathText}</div>
       </div>
-      <div style="font-size:12px;color:var(--gold-dark);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Choose Your Legacy Relic</div>
+      <div style="font-size:12px;color:var(--gold-dark);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Relics of Past Ages</div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">${relicCards}</div>
-      <div style="font-size:11px;color:var(--forest-light);font-style:italic;margin-bottom:16px">Every second dynasty also grants +1 realm administration slot.</div>
+      <div style="font-size:11px;color:var(--forest-light);font-style:italic;margin-bottom:16px">Every second age also grants +1 realm administration slot.</div>
       <button onclick="beginNewDynasty()" id="new-dynasty-btn" ${allRelicsCapped?'':'disabled'} style="width:100%;padding:12px;background:rgba(201,168,76,.1);border:1px solid var(--gold-dark);border-radius:4px;color:var(--gold);font-family:'Cinzel',serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;cursor:${allRelicsCapped?'pointer':'not-allowed'};opacity:${allRelicsCapped?'1':'.4'}">
         ${buttonText}
       </button>
@@ -550,7 +550,7 @@ function showSeasonEndScreen(finalPrestige, path){
 
 let _selectedRelic=null;
 function selectRelic(id){
-  if(countRelic(id)>=RELIC_STACK_CAP){showSnot('Relic stack cap reached');return;}
+  if(countRelic(id)>=RELIC_STACK_CAP){showSnot('Heirloom stack cap reached');return;}
   _selectedRelic=id;
   document.querySelectorAll('[data-relic]').forEach(el=>{
     el.style.borderColor=el.dataset.relic===id?'var(--gold)':'rgba(201,168,76,.2)';
@@ -564,13 +564,13 @@ function beginNewDynasty(){
   const relicIds=['relic_gold','relic_combat','relic_research'];
   const allRelicsCapped=relicIds.every(id=>countRelic(id)>=RELIC_STACK_CAP);
   if(!_selectedRelic && !allRelicsCapped){
-    showSnot('Select a relic to continue');
+    showSnot('Choose an heirloom to begin the next age');
     return;
   }
   if(_selectedRelic){
     if(countRelic(_selectedRelic)>=RELIC_STACK_CAP){
       if(!allRelicsCapped){
-        showSnot('Relic stack cap reached');
+        showSnot('Heirloom stack cap reached');
         return;
       }
       _selectedRelic=null;
@@ -611,8 +611,8 @@ function beginNewDynasty(){
   const overlay=document.getElementById('season-overlay');
   if(overlay)overlay.remove();
 
-  addLog(`Dynasty ${G.dynasty} rises. The realm carries its strength forward.`,'important');
-  showOverlay(`Dynasty ${G.dynasty} Advances\nSeason ${G.season} begins with your kingdom intact.`,'success','New Dynasty');
+  addLog(`The Chronicle Turns. Dynasty ${G.dynasty} rises, and the realm carries its strength into a new age.`,'important');
+  showOverlay(`Dynasty ${G.dynasty}\nSeason ${G.season} begins with the realm intact.`,'success','A New Age Dawns');
   renderAll();
   saveGame();
 }
@@ -3087,9 +3087,10 @@ function renderFaction(){
   tab.innerHTML=`
     <div class="section">
       <div class="section-title">⚔ Men of the West · Dynasty ${G.dynasty||1}</div>
+      <div class="ftrait"><div class="ftrait-name">Dynasty Renown</div><div class="ftrait-desc">${Math.floor(G.prestige).toLocaleString()} / ${G.prestigeGoal.toLocaleString()} renown gathered this age. Crown reserve: ${G.prestigePoints.toLocaleString()}.</div></div>
       <div class="ftrait"><div class="ftrait-name">Diplomatic Mastery</div><div class="ftrait-desc">Can form vassal treaties. Tribute scales with renown and dynasty growth.</div></div>
       <div class="ftrait"><div class="ftrait-name">Balanced Arts</div><div class="ftrait-desc">All research branches cost the same. Master of all paths.</div></div>
-      ${G.legacyRelics.length?`<div class="ftrait"><div class="ftrait-name">Legacy Relics</div><div class="ftrait-desc">${[...new Set(G.legacyRelics)].map(r=>`${relicLabel(r)} x${countRelic(r)}/${RELIC_STACK_CAP}`).join(' · ')}</div></div>`:''}
+      ${G.legacyRelics.length?`<div class="ftrait"><div class="ftrait-name">Relics of Past Ages</div><div class="ftrait-desc">${[...new Set(G.legacyRelics)].map(r=>`${relicLabel(r)} x${countRelic(r)}/${RELIC_STACK_CAP}`).join(' · ')}</div></div>`:''}
     </div>
 
     <div class="section">
@@ -3148,7 +3149,7 @@ function renderFaction(){
     </div>
 
     <div class="section">
-      <div class="section-title">⏳ Season ${G.season} Progress</div>
+      <div class="section-title">⏳ Season ${G.season} Chronicle</div>
       <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--stone-light);margin-bottom:6px">
         <span>Week ${G.seasonWeek} of ${SEASON_WEEKS}</span>
         <span>${weeksLeft} week${weeksLeft!==1?'s':''} remaining</span>
@@ -3157,14 +3158,14 @@ function renderFaction(){
         <div style="height:100%;width:${seasonPct}%;background:linear-gradient(90deg,var(--gold-dark),var(--gold));border-radius:3px;transition:width 1s"></div>
       </div>
       ${nextWeekLead?`<div style="font-size:11px;color:var(--gold-dark);font-style:italic;margin-bottom:10px">${nextWeekLead}</div>`:''}
-      ${G.seasonComplete?`<div style="font-size:12px;color:var(--gold)">Season complete. Advance your dynasty to begin the next chapter.</div>`:
+      ${G.seasonComplete?`<div style="font-size:12px;color:var(--gold)">Season complete. Begin the next age when the dynasty is ready.</div>`:
       (path?`<div style="font-size:12px;color:var(--forest-light)">✓ ${path.icon} ${path.label} · +${path.bonus}% renown bonus active</div>`:
       `<div style="font-size:12px;color:var(--stone-light);font-style:italic">No victory path achieved yet. Complete a research branch.</div>`)}
     </div>
 
     <div class="section">
-      <div class="section-title">⚜ Crown Abilities</div>
-      <div style="font-size:12px;color:var(--stone-light);font-style:italic;margin-bottom:10px">Spend renown points to activate faction abilities. Points: <span style="color:var(--gold);font-family:'Cinzel',serif">${G.prestigePoints}</span></div>
+      <div class="section-title">⚜ Crown Decrees</div>
+      <div style="font-size:12px;color:var(--stone-light);font-style:italic;margin-bottom:10px">Spend renown to proclaim temporary royal decrees. Renown held: <span style="color:var(--gold);font-family:'Cinzel',serif">${G.prestigePoints}</span></div>
       ${PRESTIGE_ABILITIES.map(a=>{
         const onCD=G.tick-a.lastUsed<a.cooldown&&a.lastUsed>0;
         const canUse=G.prestigePoints>=a.cost&&!onCD;
@@ -3172,13 +3173,13 @@ function renderFaction(){
         return`<div style="background:rgba(201,168,76,.04);border:1px solid rgba(201,168,76,.12);border-radius:4px;padding:10px;margin-bottom:7px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
             <span style="font-family:'Cinzel',serif;font-size:12px;color:var(--parchment)">${a.icon} ${a.name}</span>
-            <span style="font-family:'Cinzel',serif;font-size:10px;color:var(--gold);background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);border-radius:2px;padding:1px 6px">${a.cost} pts</span>
+            <span style="font-family:'Cinzel',serif;font-size:10px;color:var(--gold);background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);border-radius:2px;padding:1px 6px">${a.cost} renown</span>
           </div>
           <div style="font-size:11px;color:var(--stone-light);font-style:italic;margin-bottom:6px">${a.desc}</div>
           ${onCD?`<div style="font-size:11px;color:var(--blood-light)">Cooldown: ${cdRem} min remaining</div>`:''}
           <button onclick="spendPrestige(PRESTIGE_ABILITIES.find(x=>x.id==='${a.id}'))" ${canUse?'':'disabled'}
             style="width:100%;padding:5px;background:${canUse?'rgba(201,168,76,.1)':'rgba(255,255,255,.03)'};border:1px solid ${canUse?'var(--gold-dark)':'rgba(201,168,76,.15)'};border-radius:3px;color:${canUse?'var(--gold)':'var(--stone-light)'};font-family:'Cinzel',serif;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;cursor:${canUse?'pointer':'not-allowed'}">
-            ${onCD?`On Cooldown`:`Activate · ${a.cost} pts`}
+            ${onCD?`On Cooldown`:`Proclaim · ${a.cost} renown`}
           </button>
         </div>`;
       }).join('')}
