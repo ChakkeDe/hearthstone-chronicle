@@ -2281,6 +2281,198 @@ function showResourceDebugPanel(){
 window.showResourceDebugPanel=showResourceDebugPanel;
 window.closeResourceDebugPanel=closeResourceDebugPanel;
 
+const CHRONICLE_GOALS=[
+  {
+    id:'goal_barracks',
+    title:`Raise the King's Barracks`,
+    desc:'Let the first warband gather beneath your banner. A realm that would endure must first learn to muster its own strength.',
+    completeText:'The banners are raised, and the first soldiers answer the crown.',
+    when:()=>blvl('barracks')>=1,
+    progress:()=>`${blvl('barracks')}/1 Barracks levels`
+  },
+  {
+    id:'goal_first_raid',
+    title:'Win the First Raid',
+    desc:'Strike beyond the walls and prove that Arnethia can seize its future by force as well as craft.',
+    completeText:'The first victory is written into the annals of the realm.',
+    when:()=>raidVictoryCount()>=1,
+    progress:()=>`${raidVictoryCount()} raid victories`
+  },
+  {
+    id:'goal_first_tributary',
+    title:'Crown the First Tributary',
+    desc:'Turn conquest into order. Bring one village beneath your banner so tribute begins to flow back to the crown.',
+    completeText:'A first tributary bends the knee and strengthens the dynasty.',
+    when:()=>governedVillageCount()>=1,
+    progress:()=>`${governedVillageCount()}/1 tributaries crowned`
+  },
+  {
+    id:'goal_frontier',
+    title:'Reveal the Northern Frontier',
+    desc:'Push the borderlands hard enough that the deeper frontier stirs and new ambitions appear on the horizon.',
+    completeText:'The northern frontier is revealed, and wider roads open before the dynasty.',
+    when:()=>{
+      const frontierIds=['n5','n7','n8'];
+      return frontierIds.some(id=>{
+        const farm=G.npcFarms.find(f=>f.id===id);
+        return !!farm&&canSeeFarm(farm);
+      });
+    },
+    progress:()=>{
+      const victories=raidVictoryCount();
+      const governed=governedVillageCount();
+      const barracks=blvl('barracks');
+      return `${victories} victories · ${governed} tributaries · Barracks ${barracks}`
+    }
+  },
+  {
+    id:'goal_army_500',
+    title:'Muster 500 Army Power',
+    desc:'Gather a host worthy of longer marches and sterner foes. The frontier yields only to a realm that can truly field an army.',
+    completeText:'The muster is complete. The realm can now threaten greater strongholds.',
+    when:()=>calcReadyTroopPower()>=500,
+    progress:()=>`${Math.floor(calcReadyTroopPower())}/500 ready army power`
+  },
+  {
+    id:'goal_blackcrag',
+    title:'Take Blackcrag Watch',
+    desc:'Seize the first great stronghold and prove the dynasty can do more than raid - it can hold the marches.',
+    completeText:'Blackcrag Watch is taken, and the frontier begins to answer to the crown.',
+    when:()=>!!getVillageState('s1').captured,
+    progress:()=>{
+      const state=getVillageState('s1');
+      const farm=G.npcFarms.find(f=>f.id==='s1');
+      if(state.captured)return 'Captured';
+      return farm?`Week ${G.seasonWeek}/${farm.captureWeek} · ${Math.floor(state.control||0)}/${farm.controlNeed} control`:'Awaiting Blackcrag Watch';
+    }
+  },
+  {
+    id:'goal_three_tributaries',
+    title:'Unite Three Tributaries',
+    desc:'Bind three villages into the realm and let their tribute feed the heart of the dynasty.',
+    completeText:'Three tributaries now strengthen the realm and extend dynastic reach.',
+    when:()=>governedVillageCount()>=3,
+    progress:()=>`${governedVillageCount()}/3 tributaries governed`
+  },
+  {
+    id:'goal_orc_horde',
+    title:'March Against the Orc Horde',
+    desc:'Hold the strongholds, harden the frontier, and bring the realm to the edge of its greatest war.',
+    completeText:'The dynasty has faced the Orc Horde, and the chronicle enters its fiercest chapter yet.',
+    when:()=>!!getVillageState('h1').captured,
+    progress:()=>{
+      const held=capturedStrongholds().length;
+      const secured=G.npcFarms.filter(isStronghold).filter(f=>{
+        const state=getVillageState(f.id);
+        return state.captured&&state.defenseWins>=3;
+      }).length;
+      if(orcHordeUnlocked())return `Orc Horde revealed · ${held}/3 strongholds held · ${secured}/3 secured`;
+      return `${held}/3 strongholds held · ${secured}/3 secured for the Horde march`;
+    }
+  },
+];
+
+function chronicleGoalById(id){
+  return CHRONICLE_GOALS.find(goal=>goal.id===id)||null;
+}
+
+function isChronicleGoalComplete(goal){
+  return G.milestonesReached.includes(goal.id);
+}
+
+function chronicleGoalProgress(goal){
+  try{
+    return goal.progress?goal.progress():'';
+  }catch(e){
+    return '';
+  }
+}
+
+function evaluateChronicleGoals(silent=false){
+  let completedAny=false;
+  CHRONICLE_GOALS.forEach(goal=>{
+    if(isChronicleGoalComplete(goal))return;
+    let done=false;
+    try{
+      done=!!goal.when();
+    }catch(e){
+      done=false;
+    }
+    if(!done)return;
+    G.milestonesReached.push(goal.id);
+    completedAny=true;
+    if(!silent){
+      addLog(`📜 Chronicle Goal Fulfilled: ${goal.title}. ${goal.completeText}`,'important');
+      showSnot(`Chronicle updated: ${goal.title}`,3000);
+    }
+  });
+  return completedAny;
+}
+
+function currentChronicleGoal(){
+  return CHRONICLE_GOALS.find(goal=>!isChronicleGoalComplete(goal))||null;
+}
+
+function chronicleGoalLead(){
+  const current=currentChronicleGoal();
+  if(current)return `Chronicle Goal: ${current.title}.`;
+  return 'Chronicle Goal: The realm has fulfilled every written ambition of this age.';
+}
+
+function renderChronicleGoals(){
+  const el=document.getElementById('chronicle-goals');if(!el)return;
+  const completed=CHRONICLE_GOALS.filter(isChronicleGoalComplete);
+  const current=currentChronicleGoal();
+  const firstIncompleteIndex=current?CHRONICLE_GOALS.findIndex(goal=>goal.id===current.id):-1;
+  const recentCompleted=completed.slice(-2).reverse();
+  const upcoming=current
+    ?CHRONICLE_GOALS.slice(firstIncompleteIndex+1,Math.min(CHRONICLE_GOALS.length,firstIncompleteIndex+3))
+    :CHRONICLE_GOALS.slice(-3);
+  const summaryText=`${completed.length}/${CHRONICLE_GOALS.length} realm milestones fulfilled`;
+  const currentBlock=current?`
+      <div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.18);border-radius:6px;padding:12px;margin-bottom:12px">
+        <div style="font-size:11px;color:var(--gold-dark);letter-spacing:1.6px;text-transform:uppercase;margin-bottom:6px">Current Ambition</div>
+        <div style="font-family:'Cinzel',serif;font-size:15px;color:var(--parchment);margin-bottom:5px">${current.title}</div>
+        <div style="font-size:12px;color:var(--stone-light);line-height:1.55;margin-bottom:8px">${current.desc}</div>
+        <div style="font-size:11px;color:var(--forest-light);font-style:italic">${chronicleGoalProgress(current)}</div>
+      </div>`:`
+      <div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.18);border-radius:6px;padding:12px;margin-bottom:12px">
+        <div style="font-size:11px;color:var(--gold-dark);letter-spacing:1.6px;text-transform:uppercase;margin-bottom:6px">Chronicle Complete</div>
+        <div style="font-family:'Cinzel',serif;font-size:15px;color:var(--parchment);margin-bottom:5px">The Realm Stands Ready</div>
+        <div style="font-size:12px;color:var(--stone-light);line-height:1.55">Every written realm objective of this age has been fulfilled. The dynasty may press onward into its next great chapter.</div>
+      </div>`;
+  const recentBlock=recentCompleted.length?`
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;color:var(--gold-dark);letter-spacing:1.6px;text-transform:uppercase;margin-bottom:6px">Recent Chronicle Entries</div>
+        ${recentCompleted.map(goal=>`<div style="padding:7px 0;border-top:1px solid rgba(201,168,76,.1)">
+          <div style="font-family:'Cinzel',serif;font-size:12px;color:var(--forest-light)">✓ ${goal.title}</div>
+          <div style="font-size:11px;color:var(--stone-light);line-height:1.45">${goal.completeText}</div>
+        </div>`).join('')}
+      </div>`:'';
+  const upcomingBlock=`
+      <div>
+        <div style="font-size:11px;color:var(--gold-dark);letter-spacing:1.6px;text-transform:uppercase;margin-bottom:6px">${current?'Ambitions Ahead':'Realm Chronicle'}</div>
+        ${upcoming.length?upcoming.map(goal=>`<div style="padding:7px 0;border-top:1px solid rgba(201,168,76,.1)">
+          <div style="font-family:'Cinzel',serif;font-size:12px;color:${isChronicleGoalComplete(goal)?'var(--forest-light)':'var(--parchment)'}">${isChronicleGoalComplete(goal)?'✓':'•'} ${goal.title}</div>
+          <div style="font-size:11px;color:var(--stone-light);line-height:1.45">${goal.desc}</div>
+          <div style="font-size:10px;color:var(--gold-dark);font-style:italic;margin-top:3px">${isChronicleGoalComplete(goal)?goal.completeText:chronicleGoalProgress(goal)}</div>
+        </div>`).join(''):`<div style="padding:7px 0;border-top:1px solid rgba(201,168,76,.1);font-size:11px;color:var(--stone-light);line-height:1.45">The next great chapter will be written by whatever ambitions the dynasty claims beyond this age.</div>`}
+      </div>`;
+  el.innerHTML=`
+    <details open style="border:1px solid rgba(201,168,76,.14);border-radius:6px;background:rgba(255,255,255,.01);overflow:hidden">
+      <summary style="list-style:none;cursor:pointer;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-family:'Cinzel',serif;color:var(--gold);font-size:13px;letter-spacing:1.2px;text-transform:uppercase">
+        <span>📜 Chronicle Goals</span>
+        <span style="font-size:10px;color:var(--stone-light);letter-spacing:1px">${summaryText}</span>
+      </summary>
+      <div style="padding:0 14px 14px 14px">
+        <div style="font-size:12px;color:var(--stone-light);font-style:italic;line-height:1.55;margin-bottom:12px">The realm does not chase chores. It answers greater ambitions written into the dynasty's chronicle across the passing ages.</div>
+        ${currentBlock}
+        ${recentBlock}
+        ${upcomingBlock}
+      </div>
+    </details>`;
+}
+
 // ==== INIT ====
 function init(){
   const pendingLocalReset=consumePendingLocalReset();
@@ -2325,6 +2517,7 @@ function init(){
       loadGame();
       G._tickAtLastLoad=G.tick;
     }
+    evaluateChronicleGoals(true);
     applyOfflineProgress().then(()=>{
       _offlineReady=true;
       renderAll();
@@ -2639,9 +2832,11 @@ function showSnot(msg,duration=2500){
 
 // ==== RENDER ====
 function renderAll(){
+  evaluateChronicleGoals();
   renderResourceBar();
   renderPower();
   renderResources();
+  renderChronicleGoals();
   renderBuildings();
   if(G.cityDirty){renderMap();G.cityDirty=false;}
   renderResearch();
@@ -2665,9 +2860,7 @@ function renderResources(){
   const boost=earlyBoost();
   const tribute=totalVillageTributePerMinute();
   const tributeText=Object.keys(tribute).length?Object.entries(tribute).map(([k,v])=>`${G.resources[k]?.icon||k}${v.toFixed(1)}/m`).join(' '):'No tributaries yet';
-  const goalText=governedVillageCount()===0
-    ? 'First long-term goal: strengthen the realm, win your first raids, and bring a nearby village beneath your banner as a tributary.'
-    : `Realm goal: hold ${governedVillageCount()}/${currentAdminCap()} governed villages and keep tribute flowing.`;
+  const goalText=chronicleGoalLead();
   const rows=[
     boost>1?`<div class="boost-row boost-row-strong">⚡ Early Kingdom Bonus: ${boost.toFixed(1)}x income active</div>`:'',
     governedVillageCount()>0?`<div class="boost-row boost-row-realm">👑 Realm: ${governedVillageCount()}/${currentAdminCap()} villages governed · Tribute ${tributeText}</div>`:'',
