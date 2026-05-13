@@ -77,6 +77,17 @@ const G={
   supabaseUrl:'',supabaseKey:'',
 };
 
+const SEASON_THEMES={
+  1:{short:'Dawn',name:'Dawn of Campaign',desc:'The first season unfurls the realm’s ambitions and beckons the first strongholds into view.'},
+  2:{short:'Ember',name:'Ember of Expansion',desc:'Territorial fires burn brighter as new targets and deeper raids come into focus.'},
+  3:{short:'Frost',name:'Frost of Endurance',desc:'A colder, stricter campaign tests every holds and defences with steady resolve.'},
+  4:{short:'Harvest',name:'Harvest of Authority',desc:'Gains are gathered and the realm readies to turn the page on a hard-won age.'},
+};
+
+function getSeasonTheme(season=G.season){
+  return SEASON_THEMES[((season-1)%4)+1];
+}
+
 function earlyBoost(){
   // Tapers from 5x at 0 buildings to 1x at 25 total levels - much slower fade
   const t=G.buildings.reduce((s,b)=>s+b.level,0);
@@ -486,8 +497,13 @@ function seasonTick(ticks=1){
       endSeason();
       break;
     }
-    addLog(`The Chronicle Turns. Season ${G.season}, Week ${G.seasonWeek} begins across the realm.`,'important');
-    showOverlay(`Season ${G.season} - Week ${G.seasonWeek}\nA new week dawns over Arnethia.`, 'success', 'The Chronicle Turns');
+    const seasonInfo=getSeasonTheme();
+    const nextLead=weekUnlockLead();
+    addLog(`The Chronicle Turns. Season ${G.season}, Week ${G.seasonWeek} begins across the realm. ${seasonInfo.desc}`,'important');
+    showOverlay(
+      `Season ${G.season}: ${seasonInfo.name}\nWeek ${G.seasonWeek} begins across the realm.\n${seasonInfo.desc}`+
+      (nextLead?`\n${nextLead}`:'')
+    , 'success', 'The Chronicle Turns');
   }
 }
 
@@ -560,6 +576,24 @@ function selectRelic(id){
   if(btn){btn.disabled=false;btn.style.opacity='1';btn.style.cursor='pointer';}
 }
 
+function decayFrontierProgress(farm,state){
+  const controlNeed=farm.controlNeed||100;
+  const wasCaptured=!!state.captured;
+  const hadProgress=wasCaptured||((state.control||0)>0);
+  state.captured=false;
+  const retained=Math.max(0,Math.min(controlNeed-1,
+    wasCaptured
+      ? Math.max(10,Math.floor(controlNeed*0.35))
+      : Math.floor((state.control||0)*0.4)
+  ));
+  state.control=retained;
+  state.defenseWins=0;
+  state.garrison={infantry:0,archers:0,cavalry:0};
+  farm.available=true;
+  farm.respawnAt=0;
+  return hadProgress;
+}
+
 function beginNewDynasty(){
   const relicIds=['relic_gold','relic_combat','relic_research'];
   const allRelicsCapped=relicIds.every(id=>countRelic(id)>=RELIC_STACK_CAP);
@@ -588,20 +622,20 @@ function beginNewDynasty(){
   G.prestige=0;
   G.prestigePoints=0;
   G.prestigeGoal+=250;
+  let frontierDecayCount=0;
   G.npcFarms.forEach(farm=>{
     const state=getVillageState(farm.id);
     if(isFrontierTarget(farm)){
       Object.entries(state.garrison||{}).forEach(([type,qty])=>{
         if(qty>0&&G.troops[type])G.troops[type].available+=qty;
       });
-      state.captured=false;
-      state.control=0;
-      state.defenseWins=0;
-      state.garrison={infantry:0,archers:0,cavalry:0};
-      farm.available=true;
-      farm.respawnAt=0;
+      if(decayFrontierProgress(farm,state)) frontierDecayCount++;
     }
   });
+  if(frontierDecayCount>0){
+    addLog('The frontier still holds some gains as the new age begins. Control has faded, but your campaign is not erased.','important');
+    showOverlay('Frontier progress decayed, not erased. Some control remains as the new dynasty arises.','success','Frontier Fades');
+  }
 
   if(_selectedRelic==='relic_gold') G.resources.gold.rate+=2;
   if(_selectedRelic==='relic_combat') G.heroes.forEach(h=>h.power=Math.round(h.power*1.15));
@@ -747,8 +781,7 @@ function activateManaAbility(id){
   if(isManaBuffActive(id)){showSnot(`${ability.name} is already active`);return;}
   G.resources.mana.amount-=ability.cost;
   G.manaBuffs[`${id}End`]=G.tick+ability.duration;
-  addLog(`${ability.name} is invoked. ${ability.desc}`,'important');
-  showOverlay(`${ability.name}\n${ability.desc}`,'success','Mana Ritual');
+  addLog(`${ability.name} is invoked.`,'important');
   renderAll();
   saveGame();
 }
@@ -775,7 +808,7 @@ function assignHeroToArmy(i){
   if(h.onQuest){showSnot('Hero must return from quest first');return;}
   h.assignment='army';
   h.autoQuest=false;
-  addLog(`${h.name} is assigned to the field army. Army power rises by ${Math.round(heroArmyBonusFor(h)*100)}%.`,'important');
+  addLog(`${h.name} joins the field army.`);
   renderAll();
   saveGame();
 }
@@ -786,7 +819,7 @@ function assignHeroToCity(i){
   if(h.onQuest){showSnot('Hero must return from quest first');return;}
   h.assignment='city';
   h.autoQuest=false;
-  addLog(`${h.name} is assigned to the city watch. Wall defence rises by ${heroCityDefenseBonusFor(h)}.`, 'important');
+  addLog(`${h.name} joins the city watch.`);
   renderAll();
   saveGame();
 }
@@ -824,7 +857,7 @@ function trainTroops(type,qty){
   spend(cost);
   t.training=qty;
   t.trainEnd=G.tick+(def.trainTime*qty);
-  addLog(`Training ${qty} ${def.name}. Ready in ${Math.round(def.trainTime*qty/60)} min.`);
+  // Training started — visible in UI
   renderCombat();
 }
 
@@ -841,7 +874,6 @@ function checkTraining(){
       t.available+=t.training;
       t.total+=t.training;
       addLog(`${t.training} ${TROOP_DEF[type].name} are ready for battle!`,'important');
-      showOverlay(`${t.training} ${TROOP_DEF[type].name} ready!`,'success','Training Complete');
       setBadge('combat',G.activeTab!=='combat');
       t.training=0;t.trainEnd=0;
     }
@@ -953,6 +985,14 @@ function governedVillageCount(){
   return Object.values(G.governedVillages||{}).filter(v=>v.governed).length;
 }
 
+function goldOverheadPerMinute(){
+  const governed=governedVillageCount();
+  const strongholds=capturedStrongholds().length;
+  const garrisonTotal=Object.values(G.garrison||{}).reduce((sum,v)=>sum+v,0);
+  const garrisonCost=Math.floor(garrisonTotal/15)*0.5;
+  return Number((governed*0.35 + strongholds*0.9 + garrisonCost).toFixed(2));
+}
+
 function capturedStrongholds(){
   return G.npcFarms.filter(f=>isStronghold(f)&&getVillageState(f.id).captured);
 }
@@ -1034,7 +1074,6 @@ function totalWardenWallBonus(){
 }
 
 function villageTributePerMinute(farm){
-  if(isFrontierTarget(farm))return {};
   const tribute={};
   const state=getVillageState(farm.id);
   const focus=state.focus||'balanced';
@@ -1070,6 +1109,7 @@ function addVillageControl(farmId, amount){
   if(before<(farm.controlNeed||100)&&state.control>=(farm.controlNeed||100)){
     addLog(`${farm.name} is ready to be brought under your banner.`,'important');
     showOverlay(`${farm.name}\nControl established. You can now govern this village.`,'success','Village Ready');
+    renderAll();
   }
 }
 
@@ -1077,7 +1117,7 @@ function totalVillageTributePerMinute(){
   const totals={};
   G.npcFarms.forEach(farm=>{
     const state=getVillageState(farm.id);
-    if(!state.governed)return;
+    if(!state.governed && !state.captured)return;
     Object.entries(villageTributePerMinute(farm)).forEach(([key,val])=>{
       totals[key]=(totals[key]||0)+val;
     });
@@ -1089,7 +1129,7 @@ function applyVillageTribute(minutes){
   if(minutes<=0)return;
   G.npcFarms.forEach(farm=>{
     const state=getVillageState(farm.id);
-    if(!state.governed)return;
+    if(!state.governed && !state.captured)return;
     Object.entries(villageTributePerMinute(farm)).forEach(([key,val])=>{
       if(G.resources[key]){
         G.resources[key].amount=Math.min(G.resources[key].max,G.resources[key].amount+(val*minutes));
@@ -1128,7 +1168,7 @@ function setVillageFocus(farmId, focus){
   if(!villageFocusOptions(farm).includes(focus)){showSnot('That focus is not available here');return;}
   if(state.focus===focus)return;
   state.focus=focus;
-  addLog(`${farm.name} now follows a ${villageFocusLabel(focus)} focus.`,'important');
+  addLog(`${farm.name} now follows a ${villageFocusLabel(focus)} focus.`);
   renderAll();
   saveGame();
 }
@@ -1141,7 +1181,7 @@ function setVillageTrait(farmId, trait){
   if(!GOVERNOR_TRAITS[trait]){showSnot('Unknown governor trait');return;}
   if(state.trait===trait)return;
   state.trait=trait;
-  addLog(`${farm.name} now follows a ${governorTraitLabel(trait)} governor.`,'important');
+  addLog(`${farm.name} follows a ${governorTraitLabel(trait)} governor.`);
   renderAll();
   saveGame();
 }
@@ -1290,7 +1330,7 @@ function attackNPC(farmId,sent){
   G.activeRaids.push(raid);
   farm.available=false;
   farm.respawnAt=G.tick+farm.respawn;
-  addLog(`Troops march on ${farm.name}. Return in ${Math.round(travelTime*2/60)} min.`);
+  // Raid march — silent, visible in UI
   renderCombat();
 }
 
@@ -1394,8 +1434,7 @@ function checkRecovery(){
       const ret=Math.min(t.injured,remaining);
       t.injured-=ret;t.available+=ret;remaining-=ret;
     });
-    addLog(`${G.hospital.recovering} troops recover from their injuries.`,'important');
-    showOverlay(`${G.hospital.recovering} troops recovered!`,'success','Hospital');
+    addLog(`${G.hospital.recovering} troops recovered.`);
     G.hospital.recovering=0;
     setBadge('combat',G.activeTab!=='combat');
   }
@@ -1424,7 +1463,7 @@ function resolveFrontierPressure(){
           G.troops[type].injured+=loss;
           remaining-=loss;
         });
-        addLog(`${farm.name} repelled an Orc assault. Defence count: ${state.defenseWins}/3.`,'important');
+        addLog(`${farm.name} repelled an Orc assault.`);
       }else{
         Object.entries(state.garrison||{}).forEach(([type,qty])=>{
           if(qty>0)G.troops[type].injured+=qty;
@@ -1567,6 +1606,7 @@ function renderCombat(){
     const controlNeed=farm.controlNeed||100;
     const controlPct=Math.min(100,Math.round(((state.control||0)/controlNeed)*100));
     const canGovern=canGovernVillage(farm);
+    const cardStateClass=canGovern?'can-govern':'';
     const canCapture=canCaptureFrontier(farm);
     const isCapturedFrontier=isFrontierTarget(farm)&&state.captured;
     const garrison=state.garrison||{infantry:0,archers:0,cavalry:0};
@@ -1617,14 +1657,14 @@ const frontierButtons=isCapturedFrontier?`
         :((state.control||0)>=controlNeed&&governedVillageCount()>=currentAdminCap()&&!isFrontierTarget(farm))
           ?`<div style="font-size:10px;color:var(--blood-light);margin-top:8px;font-style:italic">Administration full (${governedVillageCount()}/${currentAdminCap()}). Raise Citadel or advance a dynasty.</div>`
           :'';
-    return`<div class="npc-card ${isFrontierTarget(farm)?'frontier-target':'primary-target'} ${farm.available&&canBeat&&!state.governed&&!isCapturedFrontier?'can-raid':''}">
+    return`<div class="npc-card ${isFrontierTarget(farm)?'frontier-target':'primary-target'} ${farm.available&&canBeat&&!state.governed&&!isCapturedFrontier?'can-raid':''} ${cardStateClass}">
       <div class="npc-header">
         <span class="npc-name">${farm.icon} ${farm.name}</span>
         <span class="npc-level">Lv ${farm.level}</span>
       </div>
       <div class="npc-loot">Loot: ${lootStr}</div>
       <div style="font-size:10px;color:${state.governed||isCapturedFrontier?'var(--forest-light)':'var(--stone-light)'};margin-bottom:6px">
-        ${state.governed?`Governed · ${villageFocusLabel(state.focus||'balanced')} focus · Passive tribute ${villageTributeString(farm,true)}`:(isFrontierTarget(farm)?frontierStatus:`Control ${Math.floor(state.control||0)}/${controlNeed} · ${state.victories||0} victories`)}
+        ${state.governed?`Governed · ${villageFocusLabel(state.focus||'balanced')} focus · Passive tribute ${villageTributeString(farm,true)}`:(isFrontierTarget(farm)?frontierStatus:((state.control||0)>=controlNeed?(canGovern?`Ready to govern · Crown as Tributary`:`Control complete · Awaiting administration capacity`):`Control ${Math.floor(state.control||0)}/${controlNeed} · ${state.victories||0} victories`))}
       </div>
       <div class="raid-progress" style="margin-bottom:6px"><div class="raid-progress-inner" style="width:${isCapturedFrontier?100:controlPct}%;background:${state.governed||isCapturedFrontier?'linear-gradient(90deg,var(--forest-light),var(--gold))':'linear-gradient(90deg,var(--blood-light),var(--gold))'}"></div></div>
       <div class="npc-power-row">
@@ -1833,7 +1873,7 @@ function convertToWarChest(){
   G.resources.gold.amount-=cost;
   G.warChest=Math.min(G.warChestCap,G.warChest+converted);
   G.warChestWeeklyConverted+=converted;
-  addLog(`Converted ${cost} gold → ${converted} War Chest.`);
+  // War chest conversion — silent
   renderFaction();
 }
 
@@ -1853,8 +1893,8 @@ function warChestDecayTick(){
 function toggleAutoFarm(farmId){
   if(!G.autoFarm[farmId]) G.autoFarm[farmId]={enabled:false};
   G.autoFarm[farmId].enabled=!G.autoFarm[farmId].enabled;
-  if(G.autoFarm[farmId].enabled) addLog(`Auto-raid enabled for ${G.npcFarms.find(f=>f.id===farmId)?.name}. It will only launch while the game is open and your available army can win.`);
-  else addLog(`Auto-raid stopped for ${G.npcFarms.find(f=>f.id===farmId)?.name}.`);
+  if(G.autoFarm[farmId].enabled) addLog(`Auto-raid: ${G.npcFarms.find(f=>f.id===farmId)?.name}`);
+  else addLog(`Auto-raid stopped: ${G.npcFarms.find(f=>f.id===farmId)?.name}`);
   renderCombat();
 }
 
@@ -1864,7 +1904,7 @@ function disableAutoFarm(farmId){
   }
   const wasEnabled=!!G.autoFarm[farmId].enabled;
   G.autoFarm[farmId].enabled=false;
-  if(wasEnabled)addLog(`Auto-raid stopped for ${G.npcFarms.find(f=>f.id===farmId)?.name}.`);
+  // Auto-raid stop — silent
   renderCombat();
 }
 
@@ -1894,27 +1934,27 @@ function startResearch2(id){
   if(!canAfford(rDef.cost)){showSnot('Insufficient resources');return;}
   spend(rDef.cost);
   G.activeResearch2=id;G.researchProgress2=0;
-  addLog(`Second queue: researching ${rDef.name}…`);
+  // Secondary queue started — visible in UI
   renderResearch();
 }
 function revealB(id){
   if(G.revealedBuildings.includes(id)) return;
   G.revealedBuildings.push(id);
   const b=BD.find(x=>x.id===id);
-  if(b) showOverlay(`${b.icon} ${b.name} is now available to construct.`,'success','New Building Unlocked');
+  if(b) addLog(`${b.icon} ${b.name} is now available to construct.`,'important');
 }
 function revealR(ids){
   ids.forEach(id=>{
     if(G.revealedResearch.includes(id)) return;
     G.revealedResearch.push(id);
     const r=allR().find(x=>x.id===id);
-    if(r) showOverlay(`${r.name} can now be researched.`,'success','New Research Available');
+    if(r) addLog(`${r.name} is now available to research.`,'important');
   });
 }
 function unlockTab(tab){
   if(G.unlockedResearchTabs.includes(tab)) return;
   G.unlockedResearchTabs.push(tab);
-  showOverlay(`${tab.charAt(0).toUpperCase()+tab.slice(1)} research branch unlocked!`,'success','Branch Unlocked');
+  addLog(`${tab.charAt(0).toUpperCase()+tab.slice(1)} research branch unlocked!`,'important');
 }
 const bviz=id=>G.revealedBuildings.includes(id);
 const rviz=id=>G.revealedResearch.includes(id);
@@ -2431,7 +2471,7 @@ function renderChronicleGoals(){
     :CHRONICLE_GOALS.slice(-3);
   const summaryText=`${completed.length}/${CHRONICLE_GOALS.length} realm milestones fulfilled`;
   const currentBlock=current?`
-      <div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.18);border-radius:6px;padding:12px;margin-bottom:12px">
+      <div class="current-ambition" style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.24);border-radius:6px;padding:12px;margin-bottom:12px">
         <div style="font-size:11px;color:var(--gold-dark);letter-spacing:1.6px;text-transform:uppercase;margin-bottom:6px">Current Ambition</div>
         <div style="font-family:'Cinzel',serif;font-size:15px;color:var(--parchment);margin-bottom:5px">${current.title}</div>
         <div style="font-size:12px;color:var(--stone-light);line-height:1.55;margin-bottom:8px">${current.desc}</div>
@@ -2560,7 +2600,7 @@ function gameTick(){
   G.lastActiveTime=reliableNow;
   G.tick++;
   const rally=G._rallied&&G.tick<=G._rallyEnd;
-  if(G._rallied&&G.tick>G._rallyEnd){G._rallied=false;addLog('The people\'s rally ends. Income returns to normal.');}
+  if(G._rallied&&G.tick>G._rallyEnd){G._rallied=false;} // Rally end silent
   const harvestBoost=isManaBuffActive('harvest')?1.5:1;
   const boost=earlyBoost()*(rally?2:1)*harvestBoost;
   Object.values(G.resources).forEach(r=>{if(r.rate>0)r.amount=Math.min(r.max,r.amount+(r.rate*boost)/60);});
@@ -2574,12 +2614,16 @@ function gameTick(){
     G.prestige=Math.min(G.prestigeGoal, G.prestige+rate);
     G.prestigePoints=Math.min(9999, G.prestigePoints+Math.floor(rate/5));
     applyVillageTribute(1);
+    const goldUpkeep=goldOverheadPerMinute();
+    if(goldUpkeep>0){
+      G.resources.gold.amount=Math.max(0, G.resources.gold.amount-goldUpkeep);
+    }
   }
   // Secondary iron from quarry — 0.2/min per mine level
   const mineLvl=blvl('mine');
   if(mineLvl>0&&G.tick%60===0) G.resources.iron.amount=Math.min(G.resources.iron.max, G.resources.iron.amount+(mineLvl*0.1));
   if(G.tick%480===0)resolveFrontierPressure();
-  if(G.tick%300===0){G.year++;addLog(`Year ${G.year} of the ${G.era}. The kingdom endures.`);}
+  if(G.tick%300===0){G.year++;} // Year milestone silent
   if(G.activeResearch){
     G.researchProgress+=researchSpeedMultiplier();
     const rDef=allR().find(r=>r.id===G.activeResearch);
@@ -2694,7 +2738,7 @@ function completeResearch(rDef){
   if(rDef.unlocks)revealR(rDef.unlocks);
   normalizeDerivedBuildingState();
   addLog(`Research complete: ${rDef.name}.`,'important');
-  showOverlay(`${rDef.name} complete!`,'success','Research Done');
+  showSnot(`✦ ${rDef.name} complete`);
   setBadge('research',G.activeTab!=='research');
   renderAll();
 }
@@ -2709,8 +2753,8 @@ function completeResearchQueue2(rDef,mode='queue 2'){
   applyResearchEffect(rDef);G.prestige+=30;
   if(rDef.unlocks)revealR(rDef.unlocks);
   normalizeDerivedBuildingState();
-  addLog(`Research complete (${mode}): ${rDef.name}.`,'important');
-  showOverlay(`✦ ${rDef.name} complete`,'success','Research');
+  addLog(`${rDef.name} researched (${mode}).`,'important');
+  showSnot(`✦ ${rDef.name} complete`);
   setBadge('research',G.activeTab!=='research');
 }
 function switchResearchTab(tab){
@@ -2727,8 +2771,8 @@ function spawnHero(){
   if(!avail.length)return;
   const name=avail[0],cls=HERO_CLS[G.heroes.length%HERO_CLS.length];
   G.heroes.push({name,cls,level:1,xp:0,xpGoal:100,power:5+G.heroes.length*2,hp:100,maxHp:100,onQuest:false,qt:0,qname:'',qDef:null,_ret:false,autoQuest:false,assignment:''});
-  addLog(`${name} the ${cls} joins your banner!`,'important');
-  showOverlay(`${name} the ${cls} is ready.`,'success','Hero Arrived');
+  addLog(`${h.name} the ${cls} joins your banner!`,'important');
+  showSnot(`🎖 ${h.name} the ${cls} is ready`);
   setBadge('heroes',G.activeTab!=='heroes');
 }
 function sendOnQuest(i){
@@ -2740,7 +2784,7 @@ function sendOnQuest(i){
   const q=avail[Math.floor(Math.random()*avail.length)];
   let t=q.t;if(G.questTimeMulti)t=Math.round(t*G.questTimeMulti);
   h.onQuest=true;h.qt=t;h.qname=q.name;h.qDef=q;h._ret=false;
-  addLog(`${h.name} departs for: ${q.name}. Reward: ${questRewardText(q)}. ~${Math.round(t/60)} min.`);
+  // Quest departure — silent, visible in UI
   renderHeroes();
 }
 
@@ -2751,7 +2795,7 @@ function sendHeroOnBestQuest(h){
   const q=avail[avail.length-1];
   let t=q.t;if(G.questTimeMulti)t=Math.round(t*G.questTimeMulti);
   h.onQuest=true;h.qt=t;h.qname=q.name;h.qDef=q;h._ret=false;
-  addLog(`${h.name} automatically departs for: ${q.name}. Reward: ${questRewardText(q)}. ~${Math.round(t/60)} min.`);
+  // Auto-quest departure — silent
   return true;
 }
 
@@ -2768,7 +2812,7 @@ function toggleHeroAutoQuest(i){
     showSnot(`${h.name} has reached the hero level cap`);
     return;
   }
-  addLog(`${h.name} auto-quest ${h.autoQuest?'enabled':'disabled'}.`);
+  // Auto-quest toggle — silent
   if(h.autoQuest&&!h.onQuest) sendHeroOnBestQuest(h);
   renderHeroes();
 }
@@ -2794,8 +2838,8 @@ function completeQuest(h){
   h.xp+=q.xp;
   if(h.xp>=h.xpGoal&&h.level<HERO_LEVEL_CAP){
     h.level++;h.xp-=h.xpGoal;h.xpGoal=Math.round(h.xpGoal*1.5);h.power=Math.round(h.power*1.15);
-    addLog(`${h.name} reached level ${h.level}! Power: ${h.power}`,'important');
-    showOverlay(`${h.name} reached Level ${h.level}!\nPower now: ${h.power}`,'success','Level Up!');
+    addLog(`${h.name} reached level ${h.level}!`,'important');
+    showSnot(`⚔ ${h.name} → Level ${h.level}`);
   }else if(h.level>=HERO_LEVEL_CAP){
     h.xp=Math.min(h.xp,h.xpGoal);
   }
@@ -2807,7 +2851,6 @@ function completeQuest(h){
   h.onQuest=false;h.qt=0;h.qname='';h._ret=true;
   G.prestige+=15;
   addLog(`${h.name} returns from ${q.name}. Rewards: ${rewardText}.`);
-  showOverlay(`${rewardText}\n+15 renown`,'success','Quest Rewards');
   setBadge('heroes',G.activeTab!=='heroes');
   if(h.level>=HERO_LEVEL_CAP&&h.autoQuest){
     h.autoQuest=false;
@@ -2823,6 +2866,17 @@ function addLog(msg,type){
   G.log.unshift({msg,type,time:`Yr.${G.year}`});
   if(G.log.length>40)G.log.pop();
   G.logDirty=true;
+}
+
+// Notification tier system: CRITICAL (popup+log), MAJOR (log only), SILENT (no popup, no log)
+function notify(msg,tier='major',title=''){
+  if(tier==='critical'||tier==='danger'){
+    showOverlay(msg,tier,title);
+    addLog(msg.replace(/<[^>]*>/g,''),tier);
+  }else if(tier==='major'||tier==='important'){
+    addLog(msg.replace(/<[^>]*>/g,''),tier);
+  }
+  // 'silent' tier shows nothing
 }
 
 // ==== OVERLAYS ====
@@ -2857,7 +2911,9 @@ function renderAll(){
   renderFaction();
   if(G.logDirty){renderLog();G.logDirty=false;}
   renderPrestige();
-  document.getElementById('era-display').textContent=`${G.era} · Year ${G.year}`;
+  const seasonInfo=getSeasonTheme();
+  document.body.dataset.season=((G.season-1)%4)+1;
+  document.getElementById('era-display').textContent=`Season ${G.season}: ${seasonInfo.short} · Year ${G.year}`;
   ['arcane','diplomacy'].forEach(tab=>{
     const el=document.getElementById('rtab-'+tab);
     if(el)el.classList.toggle('tab-locked',!G.unlockedResearchTabs.includes(tab));
@@ -2879,9 +2935,14 @@ function renderResources(){
     Object.entries(G.resources).map(([k,r])=>{
       const pct=Math.min(100,Math.round((r.amount/r.max)*100));
       const capColor=pct>=95?'var(--blood-light)':pct>=75?'#e8a020':'var(--forest-light)';
-      const nearCap=pct>=95;
+      const nearCap=pct>=92;
       const gain=effectiveResourceRate(k);
       const capText=resourceCapText(k,r);
+      const lowSupply=gain<0.65 && r.amount/r.max<0.35;
+      const stalled=gain<=0 && r.amount/r.max<0.55;
+      const advice=nearCap?`Spend or upgrade storage before it caps`:
+        stalled?`Income stalled — check production and upkeep`:
+        lowSupply?`Low supply — raise production or redirect spending`:'';
       return`<div class="rc ${nearCap?'near-cap':''}" data-resource-card="${k}" role="button" tabindex="0" onclick="showResourceStorageTimes()" ontouchend="showResourceStorageTimes()" title="Storage time" style="${nearCap?'border-color:rgba(192,57,43,.4);':''}">
         <div class="rc-top">
           <div class="rc-ident"><div class="rc-icon">${r.icon}</div><div class="rc-name">${r.name}</div></div>
@@ -2893,7 +2954,7 @@ function renderResources(){
         </div>
         <div class="rc-captext">${capText}</div>
         <div class="rc-capbar"><div class="rc-capfill" style="width:${pct}%;background:${capColor}"></div></div>
-        ${nearCap?`<div class="rc-warning">⚠ Near full</div>`:''}
+        ${advice?`<div class="rc-warning">${advice}</div>`:''}
       </div>`;
     }).join('');
 }
@@ -2930,6 +2991,7 @@ function effectiveResourceRate(key){
   let gain=(r.rate||0)*earlyBoost()*(rally?2:1)*harvestBoost;
   if(key==='iron')gain+=blvl('mine')*0.1;
   gain+=totalVillageTributePerMinute()[key]||0;
+  if(key==='gold') gain-=goldOverheadPerMinute();
   return gain;
 }
 
@@ -3171,9 +3233,13 @@ function renderResearch(){
     el.innerHTML=queueHtml+`<div style="font-size:13px;color:var(--stone-light);font-style:italic;padding:8px">This branch is not yet unlocked.</div>`;return;
   }
   const items=RD[tab]||[];
+  const availableResearch=items.filter(rDef=>rviz(rDef.id) && !G.research[rDef.id]?.completed && (!rDef.req || G.research[rDef.req]?.completed));
+  const queueCandidate=availableResearch[0]||null;
+  const queueFree=!q1Def || (citLvl>=3 && !q2Def);
+  const queueHint=queueCandidate && queueFree ? `<div class="research-hint">${!q1Def ? 'Recommended next research:' : 'Queue ready:'} ${queueCandidate.name}</div>` : '';
   let prog=0;
   if(G.activeResearch){const r=allR().find(x=>x.id===G.activeResearch);if(r)prog=Math.round((G.researchProgress/r.time)*100);}
-  el.innerHTML=queueHtml+items.map(rDef=>{
+  el.innerHTML=queueHtml+queueHint+items.map(rDef=>{
     const done=G.research[rDef.id]?.completed;
     const isAct=G.activeResearch===rDef.id;
     const isAct2=G.activeResearch2===rDef.id;
@@ -3187,11 +3253,12 @@ function renderResearch(){
     }).join(' ');
     const canStartPrimary=!done&&!locked&&!isAct&&!isAct2&&(!G.activeResearch||(citLvl>=3&&!G.activeResearch2));
     const canQ2=citLvl>=3&&!done&&!locked&&!G.activeResearch2&&G.activeResearch!==rDef.id&&!isAct2;
-    return`<div class="ritem ${done?'rcompleted':''} ${locked?'rlocked':''} ${isAct||isAct2?'ractive':''}"
+    const isRecommended=queueCandidate&&queueFree&&!done&&!locked&&rDef.id===queueCandidate.id;
+    return`<div class="ritem ${done?'rcompleted':''} ${locked?'rlocked':''} ${isAct||isAct2?'ractive':''} ${isRecommended?'rrecommended':''}"
       onclick="${canStartPrimary?`startResearch('${rDef.id}')`:''}"
       style="cursor:${canStartPrimary?'pointer':'default'}">
       <div class="rname" style="display:flex;justify-content:space-between;align-items:center">
-        <span>${done?'✓ ':''}${rDef.name}</span>
+        <span>${done?'✓ ':''}${rDef.name}${isRecommended?` <span class="rlabel">Recommended</span>`:''}</span>
         ${canQ2?`<button onclick="event.stopPropagation();startResearch2('${rDef.id}')" style="font-size:8px;padding:2px 5px;background:rgba(74,122,50,.15);border:1px solid rgba(74,122,50,.3);border-radius:2px;color:var(--forest-light);cursor:pointer;font-family:'Cinzel',serif;letter-spacing:.5px;touch-action:manipulation">+Q2</button>`:''}
       </div>
       <div class="rdesc">${rDef.desc}</div>
@@ -3254,6 +3321,7 @@ function renderHeroes(){
 function renderFaction(){
   const tab=document.getElementById('tab-faction');if(!tab)return;
   const path=VICTORY_PATHS[G.victoryPath];
+  const seasonInfo=getSeasonTheme();
   const seasonPct=Math.round((G.seasonWeek/SEASON_WEEKS)*100);
   const weeksLeft=SEASON_WEEKS-G.seasonWeek;
   const nextWeekLead=weekUnlockLead();
@@ -3264,6 +3332,14 @@ function renderFaction(){
   const activeManaBuffs=MANA_ABILITIES.filter(a=>isManaBuffActive(a.id));
   const strongholds=G.npcFarms.filter(isStronghold);
   const capturedSites=capturedStrongholds();
+  const frontierObjective=(()=>{
+    if(orcHordeUnlocked()) return 'The Orc Horde is exposed. Strike it down before it shatters your frontier line.';
+    if(capturedSites.length===0) return `Capture your first stronghold to begin the frontier campaign and reveal the Orc Horde.`;
+    if(capturedSites.length < strongholds.length) return `Secure all ${strongholds.length} strongholds to reveal the Orc Horde. ${capturedSites.length} are held.`;
+    const securedCount=capturedSites.filter(s=>getVillageState(s.id).defenseWins>=3).length;
+    if(securedCount < strongholds.length) return `Hold each stronghold through 3 successful defences. ${securedCount}/${strongholds.length} strongholds are fully secured.`;
+    return 'The frontier is ready. A grand challenge will soon draw out the Orc Horde.';
+  })();
   const villageCards=governed.length?governed.map(farm=>{
     const state=getVillageState(farm.id);
     const options=villageFocusOptions(farm);
@@ -3299,6 +3375,7 @@ function renderFaction(){
     <div class="section">
       <div class="section-title">👑 Realm Expansion</div>
       <div class="ftrait"><div class="ftrait-name">Administration</div><div class="ftrait-desc">${governedVillageCount()} / ${currentAdminCap()} governed villages. Base capacity ${G.adminCap}, Citadel adds ${Math.floor(blvl('citadel')/2)}, and Provincial Rule adds ${hasResearch('provincial_rule')?1:0}.</div></div>
+      <div class="ftrait"><div class="ftrait-name">Royal Exchequer</div><div class="ftrait-desc">${goldOverheadPerMinute().toFixed(1)} gold/min upkeep for governed tributaries and frontier garrisons.</div></div>
       <div class="ftrait"><div class="ftrait-name">Passive Tribute per Hour</div><div class="ftrait-desc">${Object.keys(tribute).length?tributeRateString(tribute,true).replace(/ /g,' · '):'No villages are paying tribute yet.'}</div></div>
       <div class="ftrait"><div class="ftrait-name">Governed Villages</div><div class="ftrait-desc">${governed.length?governed.map(f=>`${f.icon} ${f.name}`).join(' · '):'None yet. Win repeated raids to fill control, then crown the village from Combat.'}</div></div>
       <div class="ftrait"><div class="ftrait-name">Governor Corps</div><div class="ftrait-desc">${governed.length?`Stewards boost tribute, Wardens add ${totalWardenWallBonus()} wall defence, and Quartermasters add ${Math.round(totalQuartermasterBonus()*100)}% raid carry capacity.`:'No governors assigned yet.'}</div></div>
@@ -3309,6 +3386,7 @@ function renderFaction(){
       <div class="section-title">🛡 Frontier War</div>
       <div class="ftrait"><div class="ftrait-name">Strongholds Held</div><div class="ftrait-desc">${capturedSites.length}/${strongholds.length} strongholds captured. End-of-season renown from frontier: ${strongholdSeasonRenown()}.</div></div>
       <div class="ftrait"><div class="ftrait-name">Orc Horde Gate</div><div class="ftrait-desc">${orcHordeUnlocked()?'The Orc Horde is exposed. Break it to secure the multiplayer transfer route.':'Capture all three strongholds and successfully defend each of them three times to reveal the Orc Horde.'}</div></div>
+      <div class="ftrait objective"><div class="ftrait-name">Frontier Objective</div><div class="ftrait-desc">${frontierObjective}</div></div>
       <div class="ftrait"><div class="ftrait-name">Frontier Risk</div><div class="ftrait-desc">${capturedSites.length>=2?'Your expanding frontier is provoking Orc retaliation against both strongholds and the capital.':'Holding more frontier territory will draw stronger Orc retaliation.'}</div></div>
     </div>
 
@@ -3353,7 +3431,9 @@ function renderFaction(){
 
     <div class="section">
       <div class="section-title">⏳ Season ${G.season} Chronicle</div>
-      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--stone-light);margin-bottom:6px">
+      <div class="ftrait"><div class="ftrait-name">Season Pulse</div><div class="ftrait-desc">${seasonInfo.name} — ${seasonInfo.desc}</div></div>
+      ${nextWeekLead?`<div class="ftrait"><div class="ftrait-name">Frontier Timing</div><div class="ftrait-desc">${nextWeekLead}</div></div>`:''}
+      <div class="section-subtitle" style="display:flex;justify-content:space-between;font-size:12px;color:var(--stone-light);margin-bottom:6px">
         <span>Week ${G.seasonWeek} of ${SEASON_WEEKS}</span>
         <span>${weeksLeft} week${weeksLeft!==1?'s':''} remaining</span>
       </div>
