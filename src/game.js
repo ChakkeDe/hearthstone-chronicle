@@ -2770,10 +2770,10 @@ function spawnHero(){
   const avail=HERO_NAMES.filter(n=>!used.includes(n));
   if(!avail.length)return;
   const name=avail[0],cls=HERO_CLS[G.heroes.length%HERO_CLS.length];
-  G.heroes.push({name,cls,level:1,xp:0,xpGoal:100,power:5+G.heroes.length*2,hp:100,maxHp:100,onQuest:false,qt:0,qname:'',qDef:null,_ret:false,autoQuest:false,assignment:''});
-  addLog(`${h.name} the ${cls} joins your banner!`,'important');
-  showSnot(`🎖 ${h.name} the ${cls} is ready`);
-  setBadge('heroes',G.activeTab!=='heroes');
+const h = {name,cls,level:1,xp:0,xpGoal:100,power:5+G.heroes.length*2,hp:100,maxHp:100,onQuest:false,qt:0,qname:'',qDef:null,_ret:false,autoQuest:false,assignment:''};
+G.heroes.push(h);
+addLog(`${h.name} the ${cls} joins your banner!`,'important');
+showSnot(`🎖 ${h.name} the ${cls} is ready`);  setBadge('heroes',G.activeTab!=='heroes');
 }
 function sendOnQuest(i){
   const h=G.heroes[i];if(!h||h.onQuest)return;
