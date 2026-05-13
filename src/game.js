@@ -3148,6 +3148,14 @@ function openBuildingPopup(id){
   const lvl=blvl(id);
   const maxed=lvl>=bDef.max;
   _popupBuildingId=id;
+
+  // Add subtle tap feedback
+  const zoneEl=document.querySelector(`.city-zone[onclick*="${id}"]`);
+  if(zoneEl){
+    zoneEl.classList.add('zone-tapped');
+    setTimeout(()=>zoneEl.classList.remove('zone-tapped'),200);
+  }
+
   const nextLvl=lvl+1;
   let costs=maxed?{}:bDef.cost(nextLvl);
   if(G.costReduction&&!maxed) costs=Object.fromEntries(Object.entries(costs).map(([k,v])=>[k,Math.floor(v*G.costReduction)]));

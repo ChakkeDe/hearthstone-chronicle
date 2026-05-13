@@ -15,14 +15,18 @@ const BASE_URL='https://chakkede.github.io/hearthstone-chronicle/assets/';
 // Tap zones mapped to the composite city.jpg image (% of image width/height)
 // Each zone is a clickable region over the matching building in the scene
 
+// Tap zones mapped to the composite city.jpg image (% of image width/height)
+// Each zone is a clickable region over the matching building in the scene
+// Refined for better alignment with visible structures and mobile tap confidence
+
 const CITY_ZONES=[
-  {id:'citadel',   label:'Citadel',    x:13, y:5,  w:24, h:30},
-  {id:'tower',     label:'Mage Tower', x:62, y:3,  w:20, h:28},
-  {id:'barracks',  label:'Barracks',   x:28, y:22, w:26, h:28},
-  {id:'farm',      label:'Farm',       x:1,  y:28, w:18, h:24},
-  {id:'lumber',    label:'Lumber',     x:68, y:27, w:22, h:24},
-  {id:'mine',      label:'Quarry',     x:7,  y:50, w:22, h:24},
-  {id:'market',    label:'Market',     x:62, y:54, w:26, h:24},
-  {id:'ironworks', label:'Foundry',    x:34, y:62, w:24, h:22},
-  {id:'hospital',  label:'Hospital',   x:40, y:42, w:22, h:22},
+  {id:'citadel',   label:'Citadel',    x:10, y:2,  w:28, h:35},  // Central castle, larger for prominence
+  {id:'tower',     label:'Mage Tower', x:58, y:1,  w:24, h:32},  // Tall tower on the right
+  {id:'barracks',  label:'Barracks',   x:25, y:18, w:30, h:32},  // Military compound in center-left
+  {id:'farm',      label:'Farm',       x:1,  y:25, w:22, h:28},  // Farmland on the left
+  {id:'lumber',    label:'Lumber',     x:65, y:23, w:26, h:28},  // Forest mill on the right
+  {id:'mine',      label:'Quarry',     x:4,  y:45, w:26, h:28},  // Quarry in lower left
+  {id:'market',    label:'Market',     x:58, y:50, w:30, h:28},  // Marketplace in town center
+  {id:'ironworks', label:'Foundry',    x:30, y:58, w:28, h:26},  // Forge in lower center
+  {id:'hospital',  label:'Hospital',   x:36, y:38, w:26, h:26},  // Medical building in mid-center
 ];
