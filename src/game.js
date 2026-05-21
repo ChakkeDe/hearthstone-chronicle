@@ -1449,7 +1449,8 @@ function resolveFrontierPressure(){
       const attackPower=Math.floor(farm.def*(0.72+(state.defenseWins*0.08)));
       if(defendPower>=attackPower){
         state.defenseWins=Math.min(3,(state.defenseWins||0)+1);
-        const attrition=Math.max(1,Math.floor(Object.values(state.garrison||{}).reduce((s,v)=>s+v,0)*0.08));
+        const garrisonTotal=Object.values(state.garrison||{}).reduce((s,v)=>s+v,0);
+        const attrition=Math.max(1,Math.floor(garrisonTotal*0.08*(attackPower/defendPower)));
         let remaining=attrition;
         ['infantry','archers','cavalry'].forEach(type=>{
           const loss=Math.min(state.garrison[type]||0,remaining);
@@ -1622,7 +1623,9 @@ function renderCombat(){
     const frontierStatus=isStronghold(farm)
       ?(state.captured
         ?`Captured · Defence ${state.defenseWins||0}/3 · Garrison ${garrisonText}`
-        :`Control ${Math.floor(state.control||0)}/${controlNeed} · Win raids here to fill control, then capture`)
+        :((state.control||0)>=(controlNeed||100)
+          ?`Control filled — press Capture Stronghold`
+          :`Control ${Math.floor(state.control||0)}/${controlNeed} · Win raids here to fill control, then capture`))
       :(isOrcHorde(farm)
         ?(state.captured
           ?'Orc Horde broken · Multiplayer transfer route secured'
