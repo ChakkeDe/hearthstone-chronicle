@@ -3,33 +3,33 @@ const BD = [
   { id: 'farm', name: 'Grain Farm', icon: '🌾', max: 15, tier: 1, desc: 'Fertile fields feed your growing kingdom.',
     eff: l => `+${l * 2} food/min`,
     cost: l => ({ wood: bCost(8, l), stone: bCost(4, l) }),
-    onBuild: l => { G.resources.food.rate += 2; }, unlocks: ['lumber', 'mine'] },
+    onBuild: l => {}, unlocks: ['lumber', 'mine'] },
 
   { id: 'lumber', name: 'Lumber Mill', icon: '🪵', max: 15, tier: 1, desc: 'Axes ring through the ancient forest.',
     eff: l => `+${l * 2} wood/min`,
     cost: l => ({ gold: bCost(6, l), stone: bCost(4, l) }),
-    onBuild: l => { G.resources.wood.rate += 2; }, unlocks: ['mine', 'market'] },
+    onBuild: l => {}, unlocks: ['mine', 'market'] },
 
   { id: 'mine', name: 'Stone Quarry', icon: '⛰', max: 15, tier: 1, desc: 'Chisels bite deep into the hillside.',
     eff: l => `+${l * 2} stone/min`,
     cost: l => ({ wood: bCost(10, l), food: bCost(5, l) }),
-    onBuild: l => { G.resources.stone.rate += 2; }, unlocks: ['market', 'ironworks'] },
+    onBuild: l => {}, unlocks: ['market', 'ironworks'] },
 
   { id: 'market', name: 'Grand Market', icon: '⚖', max: 12, tier: 2, desc: 'Merchants bring coin from distant lands.',
     eff: l => `+${l * 3} gold/min`,
     cost: l => ({ wood: bCost(20, l), stone: bCost(12, l), food: bCost(8, l) }),
-    onBuild: l => { G.resources.gold.rate += 3; }, unlocks: ['ironworks'] },
+    onBuild: l => {}, unlocks: ['ironworks'] },
 
   { id: 'ironworks', name: 'Iron Foundry', icon: '🔥', max: 12, tier: 2, desc: 'Fire and hammer shape the future of war.',
     eff: l => `+${l * 1.25} iron/min`,
     cost: l => ({ stone: bCost(15, l), gold: bCost(12, l), wood: bCost(8, l) }),
-    onBuild: l => { G.resources.iron.rate += 1.25; },
+    onBuild: l => {},
     req: { mine: 1 }, unlocks: ['tower', 'barracks'] },
 
   { id: 'tower', name: 'Mage Tower', icon: '🗼', max: 10, tier: 3, desc: 'Ancient ley lines channel arcane power.',
     eff: l => `+${l * 2} mana/min, +${l * 4}% research speed`,
     cost: l => ({ stone: bCost(40, l), gold: bCost(30, l), iron: bCost(8, l) }),
-    onBuild: l => { G.resources.mana.rate += 2; revealR(['runic_script']); unlockTab('arcane'); },
+    onBuild: l => { revealR(['runic_script']); unlockTab('arcane'); },
     req: { ironworks: 1 }, unlocks: ['citadel'] },
 
   { id: 'barracks', name: "King's Barracks", icon: '⚔', max: 10, tier: 3, desc: 'Soldiers train under the banner of the West.',
@@ -42,10 +42,7 @@ const BD = [
     eff: l => `+${l * 700} caps, +${l * 25} renown/min, +${l * 50} wall defence`,
     cost: l => ({ gold: bCost(80, l), stone: bCost(60, l), iron: bCost(25, l), wood: bCost(40, l) }),
     onBuild: l => {
-      Object.values(G.resources).forEach(r => r.max += 700);
-      G.prestigeRate = (G.prestigeRate || 0) + 25;
-      G.wallDefence = (G.wallDefence || 0) + 50;
-      G.warChestCap = (G.warChestCap || 500) + 200;
+      // Caps, rates, and flags are recalculated by normalizeDerivedBuildingState after this.
       if (l >= 2) { G.watchtowerUnlocked = true; addLog('Watchtower unlocked!', 'important'); }
       if (l >= 3) { addLog('Second research queue unlocked!', 'important'); }
       revealR(['envoys']); unlockTab('diplomacy');
@@ -60,25 +57,30 @@ const BD = [
   { id: 'granary', name: 'Granary', icon: '🌾', max: 14, tier: 2, desc: 'Vast grain stores feed your armies.',
     eff: l => `+${l * 700} food cap`,
     cost: l => ({ wood: bCost(16, l), stone: bCost(12, l) }),
-    onBuild: l => { G.resources.food.max += 700; G.storageLevels.granary = l; }, req: { farm: 2 } },
+    onBuild: l => { G.storageLevels.granary = l; }, req: { farm: 2 } },
 
   { id: 'vault', name: 'Royal Vault', icon: '🏦', max: 14, tier: 2, desc: 'Secure vaults protect your treasury.',
     eff: l => `+${l * 700} gold cap`,
     cost: l => ({ stone: bCost(20, l), iron: bCost(10, l) }),
-    onBuild: l => { G.resources.gold.max += 700; G.storageLevels.vault = l; }, req: { market: 2 } },
+    onBuild: l => { G.storageLevels.vault = l; }, req: { market: 2 } },
 
   { id: 'timberyard', name: 'Timber Yard', icon: '🪵', max: 14, tier: 2, desc: 'Seasoned wood stockpiles.',
     eff: l => `+${l * 700} wood cap`,
     cost: l => ({ food: bCost(14, l), stone: bCost(10, l) }),
-    onBuild: l => { G.resources.wood.max += 700; G.storageLevels.timberyard = l; }, req: { lumber: 2 } },
+    onBuild: l => { G.storageLevels.timberyard = l; }, req: { lumber: 2 } },
 
   { id: 'armoury', name: 'Armoury', icon: '🗡', max: 14, tier: 2, desc: 'Iron stockpiles for weapons and armour.',
     eff: l => `+${l * 650} iron cap`,
     cost: l => ({ stone: bCost(24, l), wood: bCost(14, l) }),
-    onBuild: l => { G.resources.iron.max += 650; G.storageLevels.armoury = l; }, req: { ironworks: 2 } },
+    onBuild: l => { G.storageLevels.armoury = l; }, req: { ironworks: 2 } },
+
+  { id: 'stoneyard', name: 'Stone Vault', icon: '🪨', max: 14, tier: 2, desc: 'Carved stone reserves for builders and siege engineers.',
+    eff: l => `+${l * 700} stone cap`,
+    cost: l => ({ wood: bCost(14, l), gold: bCost(12, l) }),
+    onBuild: l => { G.storageLevels.stoneyard = l; }, req: { mine: 2 } },
 
   { id: 'manawell', name: 'Mana Well', icon: '🔮', max: 14, tier: 3, desc: 'Arcane reservoirs hold the power drawn from the ley lines.',
     eff: l => `+${l * 650} mana cap`,
     cost: l => ({ stone: bCost(26, l), gold: bCost(20, l), iron: bCost(8, l) }),
-    onBuild: l => { G.resources.mana.max += 650; G.storageLevels.manawell = l; }, req: { tower: 1 } },
+    onBuild: l => { G.storageLevels.manawell = l; }, req: { tower: 1 } },
 ];
