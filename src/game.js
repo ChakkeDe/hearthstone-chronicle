@@ -60,7 +60,7 @@ const G={
   activeResearch2:null,
   researchProgress2:0,
   // ==== STORAGE ====
-  storageLevels:{granary:0,vault:0,timberyard:0,armoury:0,manawell:0},
+  storageLevels:{granary:0,vault:0,timberyard:0,armoury:0,stoneyard:0,manawell:0},
   manaBuffs:{harvestEnd:0,battleEnd:0,wardEnd:0},
   // ==== UI FLAGS ====
   cityDirty:true,
@@ -130,7 +130,7 @@ const BUILDING_RATE_BONUS={
   tower:{mana:2},
 };
 const CITADEL_CAP_PER_LEVEL=700;
-const STORAGE_CAP_PER_LEVEL={granary:700,vault:700,timberyard:700,armoury:650,manawell:650};
+const STORAGE_CAP_PER_LEVEL={granary:700,vault:700,timberyard:700,armoury:650,stoneyard:700,manawell:650};
 
 const MANA_ABILITIES=[
   {id:'harvest',name:'Harvest Blessing',icon:'✨',cost:110,duration:600,desc:'+50% resource income for 10 minutes.'},
@@ -665,7 +665,7 @@ function expectedStorageCaps(){
     gold:BASE_RESOURCE_MAX.gold+(citadelLvl*CITADEL_CAP_PER_LEVEL)+(blvl('vault')*STORAGE_CAP_PER_LEVEL.vault),
     food:BASE_RESOURCE_MAX.food+(citadelLvl*CITADEL_CAP_PER_LEVEL)+(blvl('granary')*STORAGE_CAP_PER_LEVEL.granary),
     wood:BASE_RESOURCE_MAX.wood+(citadelLvl*CITADEL_CAP_PER_LEVEL)+(blvl('timberyard')*STORAGE_CAP_PER_LEVEL.timberyard),
-    stone:BASE_RESOURCE_MAX.stone+(citadelLvl*CITADEL_CAP_PER_LEVEL),
+    stone:BASE_RESOURCE_MAX.stone+(citadelLvl*CITADEL_CAP_PER_LEVEL)+(blvl('stoneyard')*STORAGE_CAP_PER_LEVEL.stoneyard),
     iron:BASE_RESOURCE_MAX.iron+(citadelLvl*CITADEL_CAP_PER_LEVEL)+(blvl('armoury')*STORAGE_CAP_PER_LEVEL.armoury),
     mana:BASE_RESOURCE_MAX.mana+(citadelLvl*CITADEL_CAP_PER_LEVEL)+(blvl('manawell')*STORAGE_CAP_PER_LEVEL.manawell),
   };
@@ -951,7 +951,8 @@ function scaledFarmLoot(farm){
 function canSeeFarm(farm){
   if(isOrcHorde(farm))return orcHordeUnlocked();
   if(isStronghold(farm)){
-    return G.seasonWeek>=Math.max(1,(farm.captureWeek||1)-1) || capturedStrongholds().length>0 || governedVillageCount()>=2;
+    // Power-gated: visible once the player has meaningful raid momentum or has already taken territory.
+    return raidVictoryCount()>=5 || capturedStrongholds().length>0 || governedVillageCount()>=2;
   }
   const victories=raidVictoryCount();
   if(farm.id==='n1')return true;
@@ -972,13 +973,8 @@ function combatRevealHint(){
 }
 
 function weekUnlockLead(){
-  const upcoming=G.npcFarms
-    .filter(f=>isStronghold(f)&&G.seasonWeek<(f.captureWeek||1))
-    .sort((a,b)=>(a.captureWeek||99)-(b.captureWeek||99))[0];
-  if(!upcoming)return '';
-  const weeksAway=(upcoming.captureWeek||1)-G.seasonWeek;
-  if(weeksAway<=0)return '';
-  return `${upcoming.name} unlocks in Week ${upcoming.captureWeek}${weeksAway>0?` (${weeksAway} week${weeksAway!==1?'s':''} away)`:''}.`;
+  // Strongholds are now power-gated, not week-gated. No calendar hints to show.
+  return '';
 }
 
 function governedVillageCount(){
@@ -1206,7 +1202,7 @@ function canCaptureFrontier(farm){
   const state=getVillageState(farm.id);
   if(!isFrontierTarget(farm)||state.captured)return false;
   if((state.control||0)<(farm.controlNeed||100))return false;
-  if(isStronghold(farm))return G.seasonWeek>=(farm.captureWeek||1);
+  if(isStronghold(farm))return true; // control alone gates capture — no week lock
   if(isOrcHorde(farm))return orcHordeUnlocked();
   return false;
 }
@@ -1216,8 +1212,7 @@ function captureFrontier(farmId){
   if(!farm||!isFrontierTarget(farm))return;
   const state=getVillageState(farmId);
   if(!canCaptureFrontier(farm)){
-    if(isStronghold(farm)&&G.seasonWeek<(farm.captureWeek||1))showSnot(`Capture unlocks in week ${farm.captureWeek}`);
-    else if(isOrcHorde(farm)&&!orcHordeUnlocked())showSnot('Hold and defend all strongholds three times first');
+    if(isOrcHorde(farm)&&!orcHordeUnlocked())showSnot('Hold and defend all strongholds three times first');
     else showSnot('Win more raids to establish control');
     return;
   }
@@ -1417,8 +1412,7 @@ function resolveRaid(raid){
 
 // ==== HOSPITAL RECOVERY ====
 function recoverInjured(count){
-  const hospitalLvl=blvl('hospital')||0;
-  const cap=50+(hospitalLvl*50);
+  const cap=G.hospital.capacity;
   const canRecover=Math.min(count,cap-G.hospital.recovering);
   if(canRecover<=0){addLog('Hospital full — some troops could not be recovered.','danger');return;}
   G.hospital.recovering+=canRecover;
@@ -1628,9 +1622,7 @@ function renderCombat(){
     const frontierStatus=isStronghold(farm)
       ?(state.captured
         ?`Captured · Defence ${state.defenseWins||0}/3 · Garrison ${garrisonText}`
-        :(G.seasonWeek<(farm.captureWeek||1)
-          ?`${farm.name} unlocks in Week ${farm.captureWeek} · ${Math.max(1,(farm.captureWeek||1)-G.seasonWeek)} week${Math.max(1,(farm.captureWeek||1)-G.seasonWeek)!==1?'s':''} to prepare`
-          :`Control ${Math.floor(state.control||0)}/${controlNeed} · Capture ready once control is filled`))
+        :`Control ${Math.floor(state.control||0)}/${controlNeed} · Win raids here to fill control, then capture`)
       :(isOrcHorde(farm)
         ?(state.captured
           ?'Orc Horde broken · Multiplayer transfer route secured'
@@ -2384,7 +2376,7 @@ const CHRONICLE_GOALS=[
       const state=getVillageState('s1');
       const farm=G.npcFarms.find(f=>f.id==='s1');
       if(state.captured)return 'Captured';
-      return farm?`Week ${G.seasonWeek}/${farm.captureWeek} · ${Math.floor(state.control||0)}/${farm.controlNeed} control`:'Awaiting Blackcrag Watch';
+      return farm?`Control ${Math.floor(state.control||0)}/${farm.controlNeed} · Season ${G.season}, Week ${G.seasonWeek}`:'Awaiting Blackcrag Watch';
     }
   },
   {
